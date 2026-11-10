@@ -19,6 +19,7 @@ import {
   KeyRound,
   Plug,
   XCircle,
+  Palette,
 } from "lucide-react";
 import {
   getSettings,
@@ -28,7 +29,6 @@ import {
   testEmbeddingConnection,
 } from "../api/interview";
 import { exportPersonalData, exportSystemData, importData } from "../api/dataMigration";
-import AfdianIcon from "../components/AfdianIcon";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { isDesktopApp } from "@/lib/desktop";
 import { getAuthToken } from "@/lib/authSession";
+import LlmHeadersField from "../components/LlmHeadersField";
+import { parseLlmHeaders } from "../lib/llmHeaders";
+import { AppearancePicker } from '../components/AppearancePicker';
 
 const DIVERGENCE_OPTIONS = [
   { value: 1, label: "聚焦薄弱", description: "100% 针对存在弱点的知识域，适合考前专项突击" },
@@ -43,27 +46,6 @@ const DIVERGENCE_OPTIONS = [
   { value: 3, label: "均衡", description: "薄弱环节巩固与全新知识盲区发掘各占 50%" },
   { value: 4, label: "侧重探索", description: "约 30% 回顾薄弱点，70% 探索全新知识层面" },
   { value: 5, label: "全面探索", description: "100% 探索未涉猎过的新知识领域，发掘潜在盲区" },
-];
-
-/**
- * key 来源的两个选项。
- *
- * 后端只存一个 `use_platform`：默认自己的 key 优先（填了就是想用它），
- * 勾上则显式改走部署方的共享 key，自己的 key 留着不删。
- */
-const LLM_SOURCE_OPTIONS = [
-  {
-    value: "platform",
-    platform: true,
-    label: "用平台提供的 key",
-    description: "不用配置，开箱即用；按账号额度计费，用完需要赞助或换成自己的 key。",
-  },
-  {
-    value: "own",
-    platform: false,
-    label: "用我自己的 key",
-    description: "不消耗平台额度，用量不设上限；费用直接结算在你自己的服务商那边。",
-  },
 ];
 
 // 连接测试行仅渲染状态并转交点击事件；禁用原因非空时禁止发起测试。
@@ -110,11 +92,9 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [compatibility, setCompatibility] = useState("generic");
+  const [httpHeaders, setHttpHeaders] = useState("");
   const [reasoningEffort, setReasoningEffort] = useState("");
   const [temperature, setTemperature] = useState(0.7);
-  // key 来源：部署方是否提供共享 key，以及用户是否显式选它
-  const [platformLlm, setPlatformLlm] = useState(false);
-  const [usePlatform, setUsePlatform] = useState(false);
   const [numQuestions, setNumQuestions] = useState(10);
   const [divergence, setDivergence] = useState(3);
   const [showKey, setShowKey] = useState(false);
@@ -167,16 +147,18 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("llm");
+  const [activeTab, setActiveTab] = useState("appearance");
 
   // Section refs for scrollspy
   const llmRef = useRef(null);
+  const appearanceRef = useRef(null);
   const embeddingRef = useRef(null);
   const servicesRef = useRef(null);
   const trainingRef = useRef(null);
   const accountRef = useRef(null);
   const migrationRef = useRef(null);
   const sectionRefs = {
+    appearance: appearanceRef,
     llm: llmRef,
     embedding: embeddingRef,
     services: servicesRef,
@@ -206,10 +188,9 @@ export default function Settings() {
         setApiKey(data.llm.api_key || "");
         setModel(data.llm.model || "");
         setCompatibility(data.llm.compatibility || "generic");
+        setHttpHeaders(data.llm.http_headers ? JSON.stringify(data.llm.http_headers, null, 2) : "");
         setReasoningEffort(data.llm.reasoning_effort || "");
         setTemperature(data.llm.temperature ?? 0.7);
-        setPlatformLlm(Boolean(data.platform?.llm));
-        setUsePlatform(data.source === "platform");
         const emb = data.embedding || {};
         setEmbBackend(emb.backend || "");
         setEmbApiBase(emb.api_base || "");
@@ -382,7 +363,7 @@ export default function Settings() {
     const version = ++llmTestVersion.current;
     setLlmTest({ status: "testing" });
     try {
-      const r = await testLLMConnection({ api_base: apiBase, api_key: apiKey, model, compatibility, reasoning_effort: reasoningEffort });
+      const r = await testLLMConnection({ api_base: apiBase, api_key: apiKey, model, compatibility, reasoning_effort: reasoningEffort, http_headers: parseLlmHeaders(httpHeaders) });
       if (llmTestVersion.current !== version) return;
       setLlmTest(r.ok ? { status: "ok" } : { status: "fail", error: r.error });
     } catch (err) {
@@ -409,21 +390,14 @@ export default function Settings() {
     }
   };
 
-  // 和后端 resolveLlmConfig 同一套判定，让用户在保存前就能看到会走哪条路。
-  // "fallback" = 选了自己的 key 但还没填全，实际仍然落回平台。
-  const llmSource =
-    usePlatform && platformLlm ? "platform" : apiKey && model ? "user" : platformLlm ? "fallback" : "user";
-  // 选了平台就把自己的那一片停掉:不只是看着灰,而是真的填不进去——
-  // 禁用的输入框浏览器也不会往里自动填。
-  const ownLlmDisabled = llmSource === "platform";
-  const temperatureDisabled = compatibility === "generic" && reasoningEffort !== "" && reasoningEffort !== "none";
+  const temperatureDisabled = compatibility === "responses" ? reasoningEffort !== "none" : compatibility === "generic" && reasoningEffort !== "" && reasoningEffort !== "none";
 
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
       const res = await updateSettings({
-        llm: { api_base: apiBase, api_key: apiKey, model, compatibility, reasoning_effort: reasoningEffort, temperature, use_platform: usePlatform },
+        llm: { api_base: apiBase, api_key: apiKey, model, compatibility, reasoning_effort: reasoningEffort, http_headers: parseLlmHeaders(httpHeaders), temperature, use_platform: false },
         embedding: {
           backend: embBackend,
           api_base: embApiBase,
@@ -496,6 +470,7 @@ export default function Settings() {
   const inputClass = "h-12 rounded-2xl bg-card/90";
 
   const TABS = [
+    { id: "appearance", label: "外观配色", icon: Palette },
     { id: "llm", label: "LLM 服务", icon: Server },
     { id: "embedding", label: "Embedding", icon: Boxes },
     { id: "services", label: "可选服务", icon: KeyRound },
@@ -511,9 +486,9 @@ export default function Settings() {
         <div className="text-sm text-dim mt-1">配置 LLM 服务和训练参数</div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
         {/* Left Tab Rail */}
-        <nav className="lg:sticky lg:top-4 lg:self-start">
+        <nav className="min-w-0 lg:sticky lg:top-4 lg:self-start">
           <div className="flex gap-1 overflow-x-auto lg:flex-col lg:gap-0.5 lg:overflow-visible">
             {TABS.map((tab) => {
               const { id, label } = tab;
@@ -546,6 +521,13 @@ export default function Settings() {
 
         {/* Right Content Pane */}
         <div className="min-w-0 space-y-5">
+        <Card ref={appearanceRef} data-tab-id="appearance" className="scroll-mt-4 border-border bg-card">
+          <CardContent className="p-5 md:p-7">
+            <h2 className="mb-2 flex items-center gap-2 text-base font-semibold"><Palette size={17} className="text-primary" />外观配色</h2>
+            <p className="mb-5 text-[13px] leading-6 text-dim">三套配色随时切换，面试、复盘与资料页统一生效。选择后自动保存，也可以从顶部或侧栏快速切换。</p>
+            <AppearancePicker />
+          </CardContent>
+        </Card>
         {/* LLM Provider */}
         <Card ref={llmRef} data-tab-id="llm" className="overflow-hidden border-border/40 bg-card/40 scroll-mt-4">
           <CardContent className="p-5 md:p-7">
@@ -554,64 +536,15 @@ export default function Settings() {
               <span className="text-base font-semibold">LLM 服务配置</span>
             </div>
             <div className="text-[13px] text-dim mb-6">
-              {platformLlm
-                ? "选择这个账号用谁的 key。配置只对你生效，更改后立即生效。"
-                : "你自己的 LLM，仅对你生效。本部署没有共享 key，这里必须填你自己的；更改后立即生效。"}
+              连接你自己的模型服务，用于面试提问、参考答法和复盘。修改后先测试连接，再保存用于后续练习。
             </div>
 
-            {platformLlm && (
-              <div className="mb-6">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {LLM_SOURCE_OPTIONS.map((option) => {
-                    const active = usePlatform === option.platform;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => {
-                          invalidateLlmTest();
-                          setUsePlatform(option.platform);
-                        }}
-                        className={cn(
-                          "rounded-2xl border p-3.5 text-left transition-colors",
-                          active
-                            ? "border-primary bg-primary/5"
-                            : "border-border/70 hover:bg-hover/60"
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[13px] font-medium text-text">{option.label}</span>
-                          {active && <Check size={15} className="shrink-0 text-primary" />}
-                        </div>
-                        <div className="mt-1 text-[12px] leading-relaxed text-dim">{option.description}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div
-                  className={cn(
-                    "mt-2.5 text-[12px] leading-relaxed",
-                    llmSource === "fallback" ? "text-orange" : "text-dim/80"
-                  )}
-                >
-                  {llmSource === "platform"
-                    ? `当前用平台的 key，按额度计费；额度用完可以换成自己的 key，或者赞助提升额度。${
-                        apiKey && model ? "你自己的 key 已保存，但现在没在用。" : ""
-                      }`
-                    : llmSource === "user"
-                      ? "当前用你自己的 key，不消耗平台额度，用量和费用都算在你自己的服务商那边。"
-                      : "Model 和 API Key 都填上才会切过去；在此之前仍然走平台的 key 和额度。"}
-                </div>
-              </div>
-            )}
-
-            <div className={cn("grid gap-4 md:grid-cols-2", ownLlmDisabled && "opacity-60")}>
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className={labelClass}>API Base URL</Label>
                 <Input
                   name="llm-api-base"
                   className={inputClass}
-                  disabled={ownLlmDisabled}
                   placeholder="例：https://api.openai.com/v1"
                   value={apiBase}
                   onChange={(e) => {
@@ -628,7 +561,6 @@ export default function Settings() {
                 <Input
                   name="llm-model"
                   className={inputClass}
-                  disabled={ownLlmDisabled}
                   placeholder="例：gpt-4o"
                   value={model}
                   onChange={(e) => {
@@ -643,7 +575,6 @@ export default function Settings() {
                   <span className="shrink-0 text-dim">请求配置</span>
                   <select
                     className="min-w-0 flex-1 bg-transparent text-right text-text outline-none disabled:cursor-not-allowed"
-                    disabled={ownLlmDisabled}
                     value={compatibility}
                     onChange={(e) => {
                       invalidateLlmTest();
@@ -653,12 +584,15 @@ export default function Settings() {
                   >
                     <option value="generic">通用 OpenAI 兼容</option>
                     <option value="deepseek">DeepSeek V4</option>
+                    <option value="responses">OpenAI Responses</option>
                   </select>
                 </label>
                 <div className="text-[12px] text-dim/70">
                   {compatibility === "deepseek"
                     ? "DeepSeek 模式为结构化请求启用 JSON 输出；默认按场景选择推理强度，显式选择时使用所选档位。"
-                    : "通用模式支持 OpenAI 兼容服务；推理模型可单独选择强度。"}
+                    : compatibility === "responses"
+                      ? "使用 /responses 接口，关闭服务端响应存储，支持仅流式网关。"
+                      : "通用模式支持 OpenAI 兼容服务；推理模型可单独选择强度。"}
                 </div>
               </div>
               <div className="space-y-2">
@@ -666,7 +600,6 @@ export default function Settings() {
                 <select
                   id="llm-reasoning-effort"
                   className={cn(inputClass, "w-full border border-border px-3.5 text-sm text-text outline-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50")}
-                  disabled={ownLlmDisabled}
                   value={reasoningEffort}
                   onChange={(e) => {
                     invalidateLlmTest();
@@ -674,12 +607,12 @@ export default function Settings() {
                   }}
                 >
                   <option value="">{compatibility === "deepseek" ? "默认（按场景）" : "跟随上游（默认）"}</option>
-                  {compatibility === "deepseek" && <option value="none">关闭推理（none）</option>}
+                  {compatibility !== "generic" && <option value="none">关闭推理（none）</option>}
                   <option value="low">轻量（low）</option>
                   {compatibility !== "deepseek" && <option value="medium">标准（medium）</option>}
                   <option value="high">深入（high）</option>
                   {compatibility !== "deepseek" && <option value="xhigh">更深入（xhigh）</option>}
-                  <option value="max">最高（max）</option>
+                  {compatibility !== "responses" && <option value="max">最高（max）</option>}
                 </select>
                 <div className="text-[12px] text-dim/70">
                   档位需模型和网关支持；强度越高通常响应越慢。选择后用于连接测试，保存后应用于后续请求。
@@ -687,14 +620,13 @@ export default function Settings() {
               </div>
             </div>
 
-            <div className={cn("grid gap-4 md:grid-cols-2 mt-4", ownLlmDisabled && "opacity-60")}>
+            <div className="grid gap-4 md:grid-cols-2 mt-4">
               <div className="space-y-2">
                 <Label className={labelClass}>API Key</Label>
                 <div className="relative">
                   <Input
                     name="llm-api-key"
                     className={cn(inputClass, "pr-11")}
-                    disabled={ownLlmDisabled}
                     masked={!showKey}
                     placeholder="sk-...（你自己的 key）"
                     value={apiKey}
@@ -705,7 +637,6 @@ export default function Settings() {
                   />
                   <button
                     type="button"
-                    disabled={ownLlmDisabled}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-dim transition-colors enabled:hover:text-text disabled:cursor-not-allowed"
                     onClick={() => setShowKey((v) => !v)}
                   >
@@ -718,7 +649,7 @@ export default function Settings() {
                 <Input
                   className={inputClass}
                   type="number"
-                  disabled={ownLlmDisabled || temperatureDisabled}
+                  disabled={temperatureDisabled}
                   step={0.1}
                   min={0}
                   max={2}
@@ -728,16 +659,16 @@ export default function Settings() {
                     setTemperature(parseFloat(e.target.value) || 0);
                   }}
                 />
-                {temperatureDisabled && <div className="text-[12px] text-dim/70">已启用推理强度，此模式下不使用 Temperature。</div>}
+                {temperatureDisabled && <div className="text-[12px] text-dim/70">{compatibility === "responses" ? "此模式下不使用 Temperature；关闭推理时可调整。" : "已启用推理强度，此模式下不使用 Temperature。"}</div>}
               </div>
             </div>
+
+            <LlmHeadersField value={httpHeaders} onChange={(value) => { invalidateLlmTest(); setHttpHeaders(value); }} />
 
             <ConnectionTestRow
               test={llmTest}
               onTest={handleTestLLM}
-              disabledHint={ownLlmDisabled
-                ? "现在用的是平台的 key，不需要测试"
-                : apiKey && model
+              disabledHint={apiKey && model
                   ? ""
                   : "填上自己的 Model 和 API Key 才能测试"}
             />
@@ -858,10 +789,11 @@ export default function Settings() {
                     <Label className={labelClass}>Model Name</Label>
                     <Input
                       className={inputClass}
-                      placeholder="例：Xenova/bge-m3"
+                      placeholder="例：Xenova/bge-small-zh-v1.5"
                       value={embLocalModel}
                       onChange={(e) => setEmbLocalModel(e.target.value)}
                     />
+                    <p className="text-xs leading-5 text-dim">中文资料可先使用 Xenova/bge-small-zh-v1.5；首次使用需下载模型，成功后缓存到本机。更换模型后请重建索引。</p>
                   </div>
                   <div className="space-y-2">
                     <Label className={labelClass}>本地路径 (可选)</Label>
@@ -1358,28 +1290,15 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* 赞助入口。放在最后一张卡片之后:用户已经用过产品,这时候开口才不突兀。 */}
         <Card className="overflow-hidden border-border/40 bg-card/40">
           <CardContent className="p-5 md:p-7">
-            <div className="flex items-center gap-2 mb-1">
-              <AfdianIcon size={16} className="text-primary" />
-              <h2 className="text-[15px] font-semibold">支持这个项目</h2>
-            </div>
-            <p className="mb-4 text-[13px] leading-relaxed text-dim">
-              TechSpar 社区版支持自行部署；官方网站和官方桌面端提供统一的平台服务与套餐。
-              你的支持会用于模型推理、服务器和持续开发。
-              <br />
-              如果它帮到了你，去爱发电赞助一点，对我意义很大。
-            </p>
-            <a
-              href="https://ifdian.net/a/techspar"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium transition-colors hover:border-primary/40 hover:text-primary"
-            >
-              <AfdianIcon size={15} className="text-primary" />
-              去爱发电赞助
-            </a>
+            <h2 className="text-[15px] font-semibold">关于面试练习室</h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-dim">围绕自己的简历和项目练习，保留问答与复盘，再用自己的话答一次。</p>
+            <p className="mt-2 text-[12px] text-dim">个人维护：xbzz1018 · Interview Room</p>
+            <details className="mt-4 text-[12px] leading-6 text-dim">
+              <summary className="cursor-pointer hover:text-text">开源来源与许可</summary>
+              <p className="mt-2">本项目由 <a href="https://github.com/AnnaSuSu/TechSpar" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">TechSpar</a> 改造，保留原作者署名，遵循 <a href="https://github.com/AnnaSuSu/TechSpar/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">GNU AGPL v3</a> 许可证。</p>
+            </details>
           </CardContent>
         </Card>
 

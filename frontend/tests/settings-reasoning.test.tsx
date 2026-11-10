@@ -17,6 +17,7 @@ for (const [key, value] of Object.entries({
 const originalFetch = globalThis.fetch;
 let root: Root | undefined;
 let savedEffort: string | undefined;
+let savedHeaders: Record<string, string>;
 let platform = false;
 let probeError = "";
 let delayProbes = false;
@@ -27,6 +28,7 @@ const json = (value: unknown) => new Response(JSON.stringify(value), { headers: 
 
 beforeEach(() => {
   savedEffort = undefined; platform = false; probeError = ""; probes.length = 0; saves.length = 0;
+  savedHeaders = {};
   delayProbes = false; pendingProbes.length = 0;
   globalThis.fetch = (async (url, options) => {
     if (String(url) === "/api/settings/test-llm") {
@@ -39,7 +41,7 @@ beforeEach(() => {
       return json({ ok: true, embedding_changed: false });
     }
     if (String(url) === "/api/settings") return json({
-      llm: { api_base: "https://provider.test/v1", api_key: "synthetic", model: "test-model", compatibility: "generic", reasoning_effort: savedEffort, temperature: 0.7 },
+      llm: { api_base: "https://provider.test/v1", api_key: "synthetic", model: "test-model", compatibility: "generic", reasoning_effort: savedEffort, temperature: 0.7, http_headers: savedHeaders },
       training: { num_questions: 10, divergence: 3 }, platform: { llm: platform }, source: platform ? "platform" : "user",
     });
     throw new Error(`Unexpected request: ${url}`);
@@ -132,12 +134,14 @@ test("defaults legacy settings to upstream behavior and shows provider errors wi
   expect(effortSelect().value).toBe("max");
 });
 
-test("disables the own reasoning setting when using platform credentials", async () => {
+test("keeps personal API controls available and saves personal credentials even for legacy platform settings", async () => {
   platform = true; savedEffort = "high"; await mount();
-  expect(effortSelect().disabled).toBeTrue();
-  expect(compatibilitySelect().disabled).toBeTrue();
-  expect(button("测试连接", llmCard()).disabled).toBeTrue();
-  expect(probes).toHaveLength(0);
+  expect(effortSelect().disabled).toBeFalse();
+  expect(compatibilitySelect().disabled).toBeFalse();
+  await click(button("测试连接", llmCard()));
+  expect(probes[0]).toMatchObject({ api_key: "synthetic", model: "test-model", reasoning_effort: "high" });
+  await click(button("保存"));
+  expect(saves[0]?.llm).toMatchObject({ use_platform: false, api_key: "synthetic", model: "test-model", reasoning_effort: "high" });
 });
 
 test("a late successful high probe cannot replace the current max failure", async () => {
@@ -164,10 +168,8 @@ test.each(["response", "rejection"] as const)("a late high %s failure cannot rep
   expect(llmCard().textContent).not.toContain("Stale high failure");
 });
 
-test.each(["effort", "compatibility", "source"] as const)("changing %s leaves a pending probe untested, even after changing back", async (field) => {
+test.each(["effort", "compatibility"] as const)("changing %s leaves a pending probe untested, even after changing back", async (field) => {
   platform = true; savedEffort = "high"; delayProbes = true; await mount();
-  const sourceButton = (text: string) => Array.from(llmCard().querySelectorAll("button")).find((element) => element.textContent?.includes(text))!;
-  await click(sourceButton("用我自己的 key"));
   await click(button("测试连接", llmCard()));
   if (field === "effort") {
     await select(effortSelect(), "max");
@@ -176,9 +178,6 @@ test.each(["effort", "compatibility", "source"] as const)("changing %s leaves a 
     await select(compatibilitySelect(), "deepseek");
     await select(compatibilitySelect(), "generic");
     await select(effortSelect(), "high");
-  } else {
-    await click(sourceButton("用平台提供的 key"));
-    await click(sourceButton("用我自己的 key"));
   }
   await finishProbe(0, { ok: true });
   expect(llmCard().textContent).not.toContain("连接正常");
@@ -198,4 +197,18 @@ test("an unmounted probe cannot affect a newly mounted settings form", async () 
   expect(effortSelect().value).toBe("max");
   expect(llmCard().textContent).toContain("Current form failure");
   expect(llmCard().textContent).not.toContain("连接正常");
+});
+
+test("Responses exposes xhigh and saves gateway headers with the selected protocol", async () => {
+  savedHeaders = { "x-openai-actor-authorization": "local-image-extension" };
+  await mount();
+  await select(compatibilitySelect(), "responses");
+  await select(effortSelect(), "xhigh");
+  expect(effortOptions()).toContain("xhigh");
+  expect(temperatureInput().disabled).toBeTrue();
+  await click(button("测试连接", llmCard()));
+  const expected = { compatibility: "responses", reasoning_effort: "xhigh", http_headers: { "x-openai-actor-authorization": "local-image-extension" } };
+  expect(probes[0]).toMatchObject(expected);
+  await click(button("保存"));
+  expect(saves[0]?.llm).toMatchObject(expected);
 });
