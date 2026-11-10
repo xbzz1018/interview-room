@@ -1,10 +1,19 @@
 # 部署说明
 
-`main` 是 TypeScript + Bun + Hono + Electron 版本，不需要 Python。旧版只保存在 `legacy/python-backend`，不得与新版同时写同一份 SQLite 或用户目录。
+当前实现使用 TypeScript + Bun + Hono + Electron，不需要 Python。回看上游 `legacy/python-backend` 请用独立 checkout 与数据副本，不得与新版同时写同一份 SQLite 或用户目录。
 
 ## 方式一：Electron 桌面客户端
 
-正式版本发布在 [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases)，当前提供 macOS Apple Silicon 和 Windows x64 安装包。
+本个人项目尚未发布安装包。Windows 可自行构建；原项目的云客户端和发行包不是本个人版的下载入口。来源见 [NOTICE](../NOTICE.md)。
+
+个人包构建与启动：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-personal.ps1
+.\启动面试练习室.cmd
+```
+
+产物位于 `dist/desktop-interview-room-themes/win-unpacked/`，保留完整目录。该入口的数据在 `local_tools/personal-data/`，不进入 Git。内部兼容标识和 exe 文件名保留，显示名称为面试练习室。
 
 ### 开发运行
 
@@ -32,9 +41,7 @@ bun run dist:desktop:win-x64   # Windows x64
 
 Electron 使用操作系统标准应用数据目录保存 SQLite、用户文件、模型缓存及每次安装随机生成的 JWT/声纹加密密钥。不要手工把服务端 `data/` 与桌面目录双向同步；迁移数据请使用产品内的导出/导入。
 
-v0.3.2 提供 macOS arm64 和 Windows x64 发行包。当前公开包没有商业签名，macOS 还没有 notarization，安装时可能出现 Gatekeeper 或 SmartScreen 提示；安装与启动仍应在对应目标平台验收。
-
-后续版本由 tag 驱动：根 `package.json` 与桌面包版本一致后推送同名 `vX.Y.Z` tag，GitHub Actions 会校验版本、分别构建 macOS arm64 和 Windows x64 包、生成 `SHA256SUMS.txt` 并发布到 Releases。未配置证书时仍会生成未签名包；配置仓库 secrets 后可启用 Apple/Windows 签名及 macOS 公证。
+现有配置保留跨平台构建目标，当前个人版只在 Windows 完成桌面流程检查。macOS/Linux、签名和个人版发布工作流尚未验收；历史版本说明不代表已发布个人包。
 
 ## 方式二：Bun Web 服务
 
@@ -125,7 +132,7 @@ LLM、Embedding、DashScope、Tavily、OSS 和腾讯 VPR 凭据默认由每个�
 
 - 普通用户通过“设置 → 数据迁移”导出个人归档；敏感凭据默认不包含。
 - 管理员可以导出全站归档；文件会校验路径、链接、tar checksum 和解压上限。
-- 全站恢复必须在所有 TechSpar 进程停止后执行；先运行 `bun run restore:system -- --archive=... --data-dir=...` 预检，再增加 `--confirm`。成功切换后旧目录保留为时间戳备份。
+- 全站恢复必须在所有本项目桌面和服务端进程停止后执行；先运行 `bun run restore:system -- --archive=... --data-dir=...` 预检，再增加 `--confirm`。成功切换后旧目录保留为时间戳备份。
 - 升级前同时备份 SQLite 和整个用户目录；不要只复制数据库。
 - 回滚旧版时必须先停止新版，再使用迁移前的数据副本启动 `legacy/python-backend`。禁止新旧服务并行写入。
 

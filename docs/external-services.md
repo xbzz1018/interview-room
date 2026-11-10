@@ -23,9 +23,9 @@
 - Model
 - Temperature
 
-接口遵循 OpenAI-compatible chat/streaming 协议。模型名必须是当前账号真实可调用的 ID；不同供应商对 Base URL 是否包含 `/v1` 的要求不同，以供应商文档为准。
+接口支持 OpenAI-compatible Chat Completions 和 Responses，按网关选择兼容模式。Responses 会发送 `stream: true`、`store: false` 和用户选择的推理强度；普通调用聚合流式正文。模型名必须是当前账号真实可调用的 ID；不同供应商对 Base URL 是否包含 `/v1` 的要求不同，以供应商文档为准。
 
-保存前先点击测试。保存后训练、面试、复盘、个人 Agent 和 Copilot 共用这套用户配置。
+保存前先点击测试。保存后训练、面试、复盘与个人 Agent 使用这套用户配置。个人启动入口清除 Copilot 专用环境配置，因此 Copilot 也沿用用户设置；其它部署若配置 `COPILOT_LLM_*`，Copilot 优先读取该配置。
 
 ## Embedding
 
@@ -36,6 +36,10 @@
 ### 本地模式
 
 本地模式通过 Transformers.js + ONNX 运行，默认模型为 `Xenova/bge-m3`。首次测试会自动下载模型并写入模型缓存，不需要 Python、PyTorch 或 pip。
+
+个人电脑处理中文资料可选择较小的 `Xenova/bge-small-zh-v1.5`，Windows 编译后端已实际验证该模型的下载和推理。模型文件约 95 MB，模型缓存还包含 tokenizer/config。文本模型与 Embedding 各司其职：简历模拟直接读取 PDF 全文，知识库向量检索、个人助手与长期记忆需要 Embedding；本地模式无需额外向量 API Key。
+
+桌面包必须保留 `backend/pdf-runtime/`、`backend/transformers-runtime/` 等整个后端目录，单独复制 `techspar-api.exe` 会丢失 PDF worker、canvas 或 ONNX 动态依赖。PDF 需包含可复制文字，扫描件应先做 OCR。
 
 切换模型后，现有派生索引会失效。保存并执行“重建索引”，等待 SSE 进度完成后再判断检索效果。
 
@@ -72,7 +76,7 @@ Bucket 可以保持私有。适配器上传文件后生成短期签名 URL，并
 
 ## 平台共享兜底
 
-机构部署可以在 `.env` 中设置 `PLATFORM_LLM_*`、`PLATFORM_EMBEDDING_*` 和 `PLATFORM_DAILY_CALL_LIMIT`，为未填写个人模型配置的用户提供共享额度。已经配置个人 key 的用户继续使用自己的配置，不占平台限额。
+个人版页面不提供共享额度选择，个人启动入口会清除这类环境变量。继承的后端仍保留兼容字段；其它自建部署可以在 `.env` 中设置 `PLATFORM_LLM_*`、`PLATFORM_EMBEDDING_*` 和 `PLATFORM_DAILY_CALL_LIMIT`，为未填写个人模型配置的用户提供共享额度。已经配置个人 key 的用户继续使用自己的配置，不占平台限额。
 
 共享平台 key 会产生集中成本和滥用风险。公开部署必须设置额度、保护 `.env`，并避免把响应或请求头中的密钥写入日志。
 
