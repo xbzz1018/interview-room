@@ -1,6 +1,6 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi'
 import { z } from 'zod'
-import { OkSchema, PersonalAgentChatResponseSchema, PersonalAgentChatSchema, PersonalAgentObjectSchema, PersonalDocumentUploadSchema } from '@techspar/contracts'
+import { OkSchema, PersonalAgentChatResponseSchema, PersonalAgentChatSchema, PersonalAgentObjectSchema, PersonalDocumentUpdateSchema, PersonalDocumentUploadSchema, PersonalDocumentReplaceSchema } from '@techspar/contracts'
 import type { PersonalAgentUseCases, TokenService } from '@techspar/core'
 import { authenticatedContext } from '../http/context.ts'
 
@@ -13,6 +13,15 @@ export function registerPersonalAgentRoutes(app: OpenAPIHono, deps: { personalAg
 
   app.openapi(createRoute({ method: 'post', path: '/api/personal-agent/documents', request: { body: { content: { 'multipart/form-data': { schema: PersonalDocumentUploadSchema } } } }, responses: { 200: { content: { 'application/json': { schema: PersonalAgentObjectSchema } }, description: 'Upload document' } } }),
     async (c) => { const file = c.req.valid('form').file; return c.json(await deps.personalAgent.upload(await authenticatedContext(c, deps.tokens), file.name || 'document', new Uint8Array(await file.arrayBuffer()))) })
+
+  app.openapi(createRoute({ method: 'put', path: '/api/personal-agent/documents/{document_id}', request: { params: DocumentPath, body: { content: { 'application/json': { schema: PersonalDocumentUpdateSchema } } } }, responses: { 200: { content: { 'application/json': { schema: PersonalAgentObjectSchema } }, description: 'Update document' } } }),
+    async (c) => c.json(await deps.personalAgent.updateDocument(await authenticatedContext(c, deps.tokens), c.req.valid('param').document_id, c.req.valid('json'))))
+
+  app.openapi(createRoute({ method: 'get', path: '/api/personal-agent/documents/{document_id}', request: { params: DocumentPath }, responses: { 200: { content: { 'application/json': { schema: PersonalAgentObjectSchema } }, description: 'Preview document' } } }),
+    async (c) => c.json(await deps.personalAgent.document(await authenticatedContext(c, deps.tokens), c.req.valid('param').document_id)))
+
+  app.openapi(createRoute({ method: 'post', path: '/api/personal-agent/documents/{document_id}/replace', request: { params: DocumentPath, body: { content: { 'multipart/form-data': { schema: PersonalDocumentReplaceSchema } } } }, responses: { 200: { content: { 'application/json': { schema: PersonalAgentObjectSchema } }, description: 'Replace document' } } }),
+    async (c) => { const { file, revision } = c.req.valid('form'); return c.json(await deps.personalAgent.replaceDocument(await authenticatedContext(c, deps.tokens), c.req.valid('param').document_id, file.name || 'document', new Uint8Array(await file.arrayBuffer()), revision)) })
 
   app.openapi(createRoute({ method: 'delete', path: '/api/personal-agent/documents/{document_id}', request: { params: DocumentPath }, responses: { 200: { content: { 'application/json': { schema: OkSchema } }, description: 'Delete document' } } }),
     async (c) => c.json(await deps.personalAgent.deleteDocument(await authenticatedContext(c, deps.tokens), c.req.valid('param').document_id)))

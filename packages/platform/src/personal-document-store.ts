@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, rename, rm } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import type { PersonalDocumentExtractor, PersonalDocumentStore } from '@techspar/core'
 import { PortableDocumentTextExtractor } from './knowledge-store.ts'
@@ -35,6 +35,11 @@ export class FilePersonalDocumentStore implements PersonalDocumentStore {
   }
   read(userId: string, storedName: string): Promise<Uint8Array> { return readFile(within(this.directory(userId), segment(storedName))) }
   async delete(userId: string, storedName: string): Promise<void> { await rm(within(this.directory(userId), segment(storedName)), { force: true }) }
+  async deleteRevisions(userId: string, documentId: string): Promise<void> {
+    const prefix = segment(documentId); const directory = this.directory(userId)
+    const names = await readdir(directory).catch((error) => { if (error.code === 'ENOENT') return []; throw error })
+    for (const name of names) if (name.startsWith(`${prefix}.`) || name.startsWith(`${prefix}-`)) await this.delete(userId, name)
+  }
 }
 
 export class PortablePersonalDocumentExtractor implements PersonalDocumentExtractor {

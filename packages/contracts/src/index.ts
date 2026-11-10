@@ -195,6 +195,8 @@ export const TargetRoleSchema = z.object({ target_role: z.string() })
 export const ProfileFeedbackSchema = z.object({ point: z.string(), verdict: z.enum(['accurate', 'inaccurate', 'acknowledged']) })
 export const RetrospectiveTaskSchema = z.object({ task_id: z.string(), status: z.literal('pending') })
 export const PersonalDocumentUploadSchema = z.object({ file: UploadedFileSchema })
+export const PersonalDocumentUpdateSchema = z.object({ content: z.string().max(600000), revision: z.string().min(1) })
+export const PersonalDocumentReplaceSchema = z.object({ file: UploadedFileSchema, revision: z.string().min(1) })
 export const PersonalAgentChatSchema = z.object({ conversation_id: z.string().nullable().optional(), message: z.string().min(1).max(12000) })
 export const PersonalAgentMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),

@@ -17,6 +17,7 @@ export type PersonalDocument = {
   error?: string | null
   created_at: string
   updated_at: string
+  revision?: string
 }
 
 export type AgentMessage = {

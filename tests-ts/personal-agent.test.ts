@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -6,6 +7,7 @@ import { zipSync, strToU8 } from 'fflate'
 import { PersonalAgentService, defaultProfile, type ChatMessage, type ProfileUseCases, type RequestContext, type TextGenerationUseCases } from '@techspar/core'
 import { BunInterviewSessionRepository, BunPersonalAgentRepository } from '@techspar/db'
 import { FilePersonalDocumentStore, PortablePersonalDocumentExtractor } from '@techspar/platform'
+import { textPdf } from './fixtures/text-pdf.ts'
 
 const roots: string[] = []
 async function root(): Promise<string> { const value = await mkdtemp(join(tmpdir(), 'techspar-personal-')); roots.push(value); return value }
@@ -26,6 +28,31 @@ class FakeAi implements TextGenerationUseCases {
 }
 
 describe('personal document library', () => {
+  test('rebuilds real PDFs loaded from disk and preserves usable document status after reopen', async () => {
+    const base = await root(), path = join(base, 'interviews.db')
+    let repository = new BunPersonalAgentRepository(path); repository.initialize()
+    const embeddings = { async embed(_context: RequestContext, texts: readonly string[]) { return texts.map(() => Float32Array.from([1, 0])) }, async signature() { return 'test' }, reset() {} }
+    const makeService = () => new PersonalAgentService({ repository, files: new FilePersonalDocumentStore(base), extractor: new PortablePersonalDocumentExtractor(), embeddings, ai: new FakeAi(), profile, ids: { next: () => 'unused' } })
+    let service = makeService()
+    const document = await service.upload(context('qa'), 'resume.pdf', textPdf())
+    expect(document.status).toBe('ready')
+    expect(await service.reindexAll(context('qa'))).toBe(1)
+    repository.close(); repository = new BunPersonalAgentRepository(path); repository.initialize(); service = makeService()
+    expect((await service.documents(context('qa'))).items[0]).toMatchObject({ status: 'ready', chunk_count: 1 })
+    expect((await repository.searchDocuments('qa', Float32Array.from([1, 0]), 2))[0]?.content).toContain('Java')
+    repository.close()
+  })
+
+  test('reports partial document rebuild failures instead of claiming success', async () => {
+    const base = await root(), repository = new BunPersonalAgentRepository(join(base, 'interviews.db')); repository.initialize()
+    let fail = false
+    const service = new PersonalAgentService({ repository, files: new FilePersonalDocumentStore(base), extractor: { async extract() { if (fail) throw new Error('test parser failure'); return 'test evidence' } }, embeddings: { async embed() { return [Float32Array.from([1, 0])] }, async signature() { return 'test' }, reset() {} }, ai: new FakeAi(), profile, ids: { next: () => 'unused' } })
+    await service.upload(context('qa'), 'test.txt', new TextEncoder().encode('test'))
+    fail = true
+    await expect(service.reindexAll(context('qa'))).rejects.toMatchObject({ status: 422, code: 'document_reindex_failed' })
+    expect((await service.documents(context('qa'))).items[0]).toMatchObject({ status: 'error', error: 'test parser failure' })
+    repository.close()
+  })
   test('scopes files and vectors by user and deletes both', async () => {
     const base = await root(); const repository = new BunPersonalAgentRepository(join(base, 'interviews.db')); repository.initialize()
     const service = new PersonalAgentService({
@@ -91,5 +118,74 @@ describe('personal agent conversation', () => {
     expect(conversation.messages[1]!.sources?.[0]?.filename).toBe('python-notes.md')
     await expect(service.conversation(context('user-b'), String(result.conversation_id))).rejects.toThrow('对话不存在')
     repository.close()
+  })
+})
+
+
+describe('personal document revisions', () => {
+  async function fixture() {
+    const base = await root(); const repository = new BunPersonalAgentRepository(join(base, 'revisions.db')); repository.initialize()
+    let fail = false
+    const service = new PersonalAgentService({ repository, files: new FilePersonalDocumentStore(base), extractor: new PortablePersonalDocumentExtractor(),
+      embeddings: { async embed(_context, texts) { if (fail) throw new Error('embedding unavailable'); return texts.map(() => Float32Array.from([1, 0])) }, async signature() { return 'test' }, reset() {} }, ai: new FakeAi(), profile, ids: { next: () => 'unused' } })
+    const document = await service.upload(context('qa'), 'project.md', new TextEncoder().encode('旧证据：使用唯一约束'))
+    return { base, service, repository, document, fail() { fail = true } }
+  }
+  test('edits replace the retrievable evidence and reject stale revisions', async () => {
+    const f = await fixture()
+    try {
+      const detail = await f.service.document(context('qa'), f.document.document_id)
+      expect(detail).toMatchObject({ editable: true, content: '旧证据：使用唯一约束' })
+      const updated = await f.service.updateDocument(context('qa'), f.document.document_id, { content: '新证据：事务内写入', revision: f.document.revision! })
+      expect(updated.revision).not.toBe(f.document.revision)
+      const hits = await f.repository.searchDocuments('qa', Float32Array.from([1, 0]), 10)
+      expect(hits.map((hit) => hit.content).join('')).toContain('新证据')
+      expect(hits.map((hit) => hit.content).join('')).not.toContain('旧证据')
+      await expect(f.service.updateDocument(context('qa'), f.document.document_id, { content: '冲突版本', revision: f.document.revision! })).rejects.toMatchObject({ status: 409 })
+      expect((await f.service.document(context('qa'), f.document.document_id)).content).toContain('新证据')
+      await f.service.deleteDocument(context('qa'), f.document.document_id)
+      expect(await readdir(join(f.base, 'users/qa/library'))).toEqual([])
+    } finally { f.repository.close() }
+  })
+  test('embedding failures preserve original bytes, metadata and vectors', async () => {
+    const f = await fixture()
+    try {
+      f.fail()
+      await expect(f.service.updateDocument(context('qa'), f.document.document_id, { content: '失败改动', revision: f.document.revision! })).rejects.toThrow()
+      expect((await f.service.document(context('qa'), f.document.document_id)).content).toContain('旧证据')
+      expect((await f.service.documents(context('qa'))).items[0]?.revision).toBe(f.document.revision)
+      expect((await f.repository.searchDocuments('qa', Float32Array.from([1, 0]), 2))[0]?.content).toContain('旧证据')
+    } finally { f.repository.close() }
+  })
+  test('an insert failure rolls back revision metadata and all vectors and removes the uncommitted file', async () => {
+    const f = await fixture(); const db = new Database(join(f.base, 'revisions.db'))
+    try {
+      const files = await readdir(join(f.base, 'users/qa/library'))
+      db.exec("CREATE TRIGGER fail_revision BEFORE INSERT ON memory_vectors WHEN NEW.content = '失败改动' BEGIN SELECT RAISE(ABORT, 'synthetic vector write failure'); END")
+      await expect(f.service.updateDocument(context('qa'), f.document.document_id, { content: '失败改动', revision: f.document.revision! })).rejects.toThrow('synthetic vector write failure')
+      expect((await f.service.document(context('qa'), f.document.document_id)).content).toBe('旧证据：使用唯一约束')
+      expect((await f.service.documents(context('qa'))).items[0]?.revision).toBe(f.document.revision)
+      expect((await f.repository.searchDocuments('qa', Float32Array.from([1, 0]), 2)).map((hit) => hit.content)).toEqual(['旧证据：使用唯一约束'])
+      expect(await readdir(join(f.base, 'users/qa/library'))).toEqual(files)
+    } finally { db.close(); f.repository.close() }
+  })
+  test('previews binary files, replaces them under the same document ID, and isolates users', async () => {
+    const f = await fixture()
+    try {
+      const replaced = await f.service.replaceDocument(context('qa'), f.document.document_id, 'resume.pdf', textPdf(), f.document.revision!)
+      const detail = await f.service.document(context('qa'), replaced.document_id)
+      expect(detail.editable).toBeFalse(); expect(detail.content).toContain('Java')
+      await expect(f.service.updateDocument(context('qa'), replaced.document_id, { content: 'bad', revision: replaced.revision! })).rejects.toMatchObject({ status: 400 })
+      await expect(f.service.document(context('other'), replaced.document_id)).rejects.toMatchObject({ status: 404 })
+      await expect(f.service.documentText(context('other'), [replaced.document_id])).rejects.toMatchObject({ status: 409 })
+    } finally { f.repository.close() }
+  })
+  test('two concurrent editors cannot commit different bodies under one revision', async () => {
+    const f = await fixture()
+    try {
+      const results = await Promise.allSettled(['修改 A', '修改 B'].map((content) => f.service.updateDocument(context('qa'), f.document.document_id, { content, revision: f.document.revision! })))
+      expect(results.filter((item) => item.status === 'fulfilled')).toHaveLength(1)
+      expect(results.filter((item) => item.status === 'rejected')).toHaveLength(1)
+    } finally { f.repository.close() }
   })
 })

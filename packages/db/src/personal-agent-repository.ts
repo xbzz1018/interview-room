@@ -61,17 +61,26 @@ export class BunPersonalAgentRepository implements PersonalAgentRepository {
   async createDocument(input: { documentId: string; userId: string; filename: string; storedName: string; extension: string; sizeBytes: number }): Promise<void> {
     this.sqlite.query("INSERT INTO personal_documents (document_id, user_id, filename, stored_name, extension, size_bytes, status) VALUES ($id, $userId, $filename, $storedName, $extension, $size, 'indexing')").run({ $id: input.documentId, $userId: input.userId, $filename: input.filename, $storedName: input.storedName, $extension: input.extension, $size: input.sizeBytes })
   }
+  async commitDocumentRevision(input: { documentId: string; userId: string; expectedStoredName: string; storedName: string; filename: string; extension: string; sizeBytes: number; chunks: Array<{ content: string; embedding: Float32Array }> }): Promise<boolean> {
+    return this.sqlite.transaction(() => {
+      const changed = this.sqlite.query("UPDATE personal_documents SET stored_name=$stored, filename=$filename, extension=$extension, size_bytes=$size, status='ready', chunk_count=$count, error=NULL, updated_at=$now WHERE document_id=$id AND user_id=$user AND stored_name=$expected").run({ $stored: input.storedName, $filename: input.filename, $extension: input.extension, $size: input.sizeBytes, $count: input.chunks.length, $now: new Date().toISOString(), $id: input.documentId, $user: input.userId, $expected: input.expectedStoredName }).changes
+      if (!changed) return false
+      this.writeDocumentChunks(input)
+      return true
+    }).immediate()
+  }
   async setDocumentStatus(input: { documentId: string; userId: string; status: PersonalDocument['status']; chunkCount?: number; error?: string }): Promise<void> {
     this.sqlite.query('UPDATE personal_documents SET status = $status, chunk_count = $count, error = $error, updated_at = CURRENT_TIMESTAMP WHERE document_id = $id AND user_id = $userId').run({ $status: input.status, $count: input.chunkCount || 0, $error: input.error ?? null, $id: input.documentId, $userId: input.userId })
   }
   async deleteDocument(documentId: string, userId: string): Promise<boolean> { return this.sqlite.query('DELETE FROM personal_documents WHERE document_id = $id AND user_id = $userId').run({ $id: documentId, $userId: userId }).changes > 0 }
   async replaceDocumentChunks(input: { documentId: string; userId: string; filename: string; chunks: Array<{ content: string; embedding: Float32Array }> }): Promise<void> {
-    this.sqlite.transaction(() => {
+    this.sqlite.transaction(() => this.writeDocumentChunks(input))()
+  }
+  private writeDocumentChunks(input: { documentId: string; userId: string; filename: string; chunks: Array<{ content: string; embedding: Float32Array }> }): void {
       this.sqlite.query("DELETE FROM memory_vectors WHERE chunk_type = 'personal_document_chunk' AND session_id = $id AND user_id = $userId").run({ $id: input.documentId, $userId: input.userId })
       const statement = this.sqlite.query("INSERT INTO memory_vectors (chunk_type, content, topic, session_id, metadata, embedding, user_id, created_at) VALUES ('personal_document_chunk', $content, NULL, $id, $metadata, $embedding, $userId, $createdAt)")
       const createdAt = new Date().toISOString(); const metadata = JSON.stringify({ document_id: input.documentId, source: input.filename })
       for (const chunk of input.chunks) statement.run({ $content: chunk.content, $id: input.documentId, $metadata: metadata, $embedding: toBlob(chunk.embedding), $userId: input.userId, $createdAt: createdAt })
-    })()
   }
   async deleteDocumentChunks(documentId: string, userId: string): Promise<void> { this.sqlite.query("DELETE FROM memory_vectors WHERE chunk_type = 'personal_document_chunk' AND session_id = $id AND user_id = $userId").run({ $id: documentId, $userId: userId }) }
   async searchDocuments(userId: string, embedding: Float32Array, topK: number): Promise<PersonalDocumentHit[]> {

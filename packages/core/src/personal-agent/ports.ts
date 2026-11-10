@@ -9,6 +9,7 @@ export interface PersonalAgentRepository {
   listDocuments(userId: string): Promise<PersonalDocument[]>
   getDocument(documentId: string, userId: string): Promise<PersonalDocument | undefined>
   createDocument(input: { documentId: string; userId: string; filename: string; storedName: string; extension: string; sizeBytes: number }): Promise<void>
+  commitDocumentRevision(input: { documentId: string; userId: string; expectedStoredName: string; storedName: string; filename: string; extension: string; sizeBytes: number; chunks: Array<{ content: string; embedding: Float32Array }> }): Promise<boolean>
   setDocumentStatus(input: { documentId: string; userId: string; status: PersonalDocument['status']; chunkCount?: number; error?: string }): Promise<void>
   deleteDocument(documentId: string, userId: string): Promise<boolean>
   replaceDocumentChunks(input: { documentId: string; userId: string; filename: string; chunks: Array<{ content: string; embedding: Float32Array }> }): Promise<void>
@@ -28,6 +29,7 @@ export interface PersonalDocumentStore {
   save(userId: string, storedName: string, bytes: Uint8Array): Promise<void>
   read(userId: string, storedName: string): Promise<Uint8Array>
   delete(userId: string, storedName: string): Promise<void>
+  deleteRevisions(userId: string, documentId: string): Promise<void>
 }
 
 export interface PersonalDocumentExtractor {
@@ -37,6 +39,10 @@ export interface PersonalDocumentExtractor {
 export interface PersonalAgentUseCases {
   documents(context: RequestContext): Promise<{ items: PersonalDocument[]; supported_extensions: string[]; max_upload_bytes: number }>
   upload(context: RequestContext, filename: string, bytes: Uint8Array): Promise<PersonalDocument>
+  updateDocument(context: RequestContext, documentId: string, input: { content: string; revision: string }): Promise<PersonalDocument>
+  replaceDocument(context: RequestContext, documentId: string, filename: string, bytes: Uint8Array, revision: string): Promise<PersonalDocument>
+  document(context: RequestContext, documentId: string): Promise<{ document: PersonalDocument; content: string; editable: boolean }>
+  documentText(context: RequestContext, documentIds: string[]): Promise<Array<{ document_id: string; filename: string; content: string; updated_at: string }>>
   deleteDocument(context: RequestContext, documentId: string): Promise<{ ok: true }>
   conversations(context: RequestContext): Promise<{ items: unknown[] }>
   conversation(context: RequestContext, conversationId: string): Promise<PersonalConversation>
