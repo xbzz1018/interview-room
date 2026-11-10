@@ -1,4 +1,5 @@
 import { consumeInterviewStream, consumeIndexRebuildStream, type ChatStreamCallbacks, type RebuildIndexCallbacks } from './events';
+import { responseErrorText } from './errors';
 import {
   API_BASE,
   authFetch,
@@ -20,12 +21,13 @@ export async function transcribeAudio(
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
 export async function getTopics(): Promise<ApiResponse<"/api/topics", "get">> {
   const res = await authFetch(`${API_BASE}/topics`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -38,7 +40,7 @@ export async function createTopic(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, icon }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -48,7 +50,7 @@ export async function deleteTopic(
   const res = await authFetch(`${API_BASE}/topics/${encodeURIComponent(key)}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -58,6 +60,7 @@ export async function getResumeStatus(): Promise<
   ApiResponse<"/api/resume/status", "get">
 > {
   const res = await authFetch(`${API_BASE}/resume/status`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -70,13 +73,13 @@ export async function uploadResume(
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
 export async function getResumePdfBlob(): Promise<Blob> {
   const res = await authFetch(`${API_BASE}/resume/file`);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.blob();
 }
 
@@ -84,7 +87,7 @@ export async function deleteUploadedResume(): Promise<
   ApiResponse<"/api/resume", "delete">
 > {
   const res = await authFetch(`${API_BASE}/resume`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -92,7 +95,7 @@ export async function parseUploadedResume(): Promise<
   ApiResponse<"/api/resume/parse", "post">
 > {
   const res = await authFetch(`${API_BASE}/resume/parse`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -117,24 +120,34 @@ interface StartInterviewOptions {
   divergence?: StartInterviewBody["divergence"];
   targetRole?: StartInterviewBody["target_role"];
   jobDescription?: StartInterviewBody["job_description"];
+  trainingMode?: "strict" | "coach";
+  materialDocumentIds?: string[];
+  resumeDocumentId?: string;
+  jdDocumentId?: string;
+  useResume?: boolean;
 }
 
 export async function startInterview(
   mode: InterviewMode,
   topic: StartInterviewBody["topic"] = null,
-  { numQuestions, divergence, targetRole, jobDescription }: StartInterviewOptions = {}
+  { numQuestions, divergence, targetRole, jobDescription, trainingMode, materialDocumentIds, resumeDocumentId, jdDocumentId, useResume }: StartInterviewOptions = {}
 ): Promise<ApiResponse<"/api/interview/start", "post">> {
   const body: StartInterviewBody = { mode, topic };
   if (numQuestions != null) body.num_questions = numQuestions;
   if (divergence != null) body.divergence = divergence;
   if (targetRole != null) body.target_role = targetRole;
   if (jobDescription != null) body.job_description = jobDescription;
+  if (trainingMode != null) body.training_mode = trainingMode;
+  if (materialDocumentIds != null) body.material_document_ids = materialDocumentIds;
+  if (resumeDocumentId) body.resume_document_id = resumeDocumentId;
+  if (jdDocumentId) body.jd_document_id = jdDocumentId;
+  if (useResume != null) body.use_resume = useResume;
   const res = await authFetch(`${API_BASE}/interview/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -144,7 +157,7 @@ export async function inferTargetRole(): Promise<
   const res = await authFetch(`${API_BASE}/profile/infer-target-role`, {
     method: "POST",
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -156,7 +169,7 @@ export async function previewJobPrep(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -168,7 +181,7 @@ export async function startJobPrep(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -181,7 +194,7 @@ export async function sendMessage(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, message }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -195,7 +208,7 @@ export async function sendMessageStream(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, message }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
 
   await consumeInterviewStream(res, { onToken, onDone, onError });
 }
@@ -210,7 +223,7 @@ export async function endInterview(
     options.body = JSON.stringify({ answers });
   }
   const res = await authFetch(`${API_BASE}/interview/end/${sessionId}`, options);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -223,7 +236,7 @@ export async function saveDraftAnswers(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ answers }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -231,7 +244,7 @@ export async function getReview(
   sessionId: string
 ): Promise<ApiResponse<"/api/interview/review/{session_id}", "get">> {
   const res = await authFetch(`${API_BASE}/interview/review/${sessionId}`);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -244,7 +257,7 @@ export async function retryReview(
       method: "POST",
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -254,7 +267,7 @@ export async function getResumableSession(
   const res = await authFetch(
     `${API_BASE}/interview/session/${sessionId}/resume`
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -262,7 +275,7 @@ export async function getTaskStatus(
   taskId: string
 ): Promise<ApiResponse<"/api/tasks/{task_id}", "get">> {
   const res = await authFetch(`${API_BASE}/tasks/${taskId}`);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -278,7 +291,21 @@ export async function getReferenceAnswer(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, question_id: questionId }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
+  return res.json();
+}
+
+export type TrainingAttempt = { attempt_id: string; question_id: string; question: string; answer: string; original_answer: string; comparison: string; technical_gaps: Array<{ point: string; evidence: string; exercise: string }>; expression_gaps: Array<{ point: string; evidence: string; exercise: string }>; created_at: string; assisted: true };
+
+export async function compareAnswer(sessionId: string, questionId: string | number, answer: string, requestId: string): Promise<TrainingAttempt> {
+  const res = await authFetch(`${API_BASE}/interview/compare-answer`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: sessionId, question_id: questionId, answer, request_id: requestId }) });
+  if (!res.ok) throw new Error(await responseErrorText(res));
+  return res.json();
+}
+
+export async function getTrainingProgress(): Promise<{ items: Array<TrainingAttempt & { session_id: string; training_mode: string }> }> {
+  const res = await authFetch(`${API_BASE}/interview/training-progress`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -295,6 +322,7 @@ export async function getHistory(
   if (mode) params.set("mode", mode);
   if (topic) params.set("topic", topic);
   const res = await authFetch(`${API_BASE}/interview/history?${params}`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -304,7 +332,7 @@ export async function deleteSession(
   const res = await authFetch(`${API_BASE}/interview/session/${sessionId}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -312,6 +340,7 @@ export async function getInterviewTopics(): Promise<
   ApiResponse<"/api/interview/topics", "get">
 > {
   const res = await authFetch(`${API_BASE}/interview/topics`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -321,7 +350,7 @@ export async function getGraphData(
   topic: string
 ): Promise<ApiResponse<"/api/graph/{topic}", "get">> {
   const res = await authFetch(`${API_BASE}/graph/${topic}`);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -329,6 +358,7 @@ export async function getGraphData(
 
 export async function getProfile(): Promise<ApiResponse<"/api/profile", "get">> {
   const res = await authFetch(`${API_BASE}/profile`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -336,7 +366,7 @@ export async function markProfileViewed(): Promise<
   ApiResponse<"/api/profile/viewed", "post">
 > {
   const res = await authFetch(`${API_BASE}/profile/viewed`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -355,7 +385,7 @@ export async function sendPatternFeedback(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ point, verdict }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -368,7 +398,7 @@ export async function getTopicRetrospective(
       method: "POST",
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -376,6 +406,7 @@ export async function getTopicHistory(
   topic: string
 ): Promise<ApiResponse<"/api/profile/topic/{topic}/history", "get">> {
   const res = await authFetch(`${API_BASE}/profile/topic/${topic}/history`);
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -387,6 +418,7 @@ export async function getCoreKnowledge(
   const res = await authFetch(
     `${API_BASE}/knowledge/${encodeURIComponent(topic)}/core`
   );
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -403,7 +435,7 @@ export async function updateCoreKnowledge(
       body: JSON.stringify({ content }),
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -417,7 +449,7 @@ export async function deleteCoreKnowledge(
       method: "DELETE",
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -434,7 +466,7 @@ export async function createCoreKnowledge(
       body: JSON.stringify({ filename, content }),
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -451,7 +483,7 @@ export async function uploadKnowledgeDoc(
       body: form,
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -464,7 +496,7 @@ export async function generateKnowledge(
       method: "POST",
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -487,7 +519,7 @@ export async function transcribeRecording(
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -510,7 +542,7 @@ export async function analyzeRecording(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -520,6 +552,7 @@ export async function getHighFreq(
   const res = await authFetch(
     `${API_BASE}/knowledge/${encodeURIComponent(topic)}/high_freq`
   );
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -535,7 +568,7 @@ export async function updateHighFreq(
       body: JSON.stringify({ content }),
     }
   );
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -545,7 +578,7 @@ export async function getSettings(): Promise<
   ApiResponse<"/api/settings", "get">
 > {
   const res = await authFetch(`${API_BASE}/settings`);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -557,7 +590,7 @@ export async function updateSettings(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -574,7 +607,7 @@ export async function testLLMConnection(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -586,7 +619,7 @@ export async function testEmbeddingConnection(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }
 
@@ -598,7 +631,7 @@ export async function rebuildEmbeddingIndex({
   const res = await authFetch(`${API_BASE}/settings/rebuild-index`, {
     method: "POST",
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await responseErrorText(res));
 
   await consumeIndexRebuildStream(res, { onProgress, onDone, onError });
 }

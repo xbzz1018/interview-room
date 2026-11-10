@@ -1,6 +1,7 @@
 import { API_BASE, authFetch } from "./client";
 
 export interface DocumentItem {
+  revision?: string;
   document_id: string;
   filename: string;
   extension: string;
@@ -72,6 +73,22 @@ export async function deleteDocument(documentId: string): Promise<void> {
   await parseResponse(await authFetch(`${API_BASE}/personal-agent/documents/${documentId}`, {
     method: "DELETE",
   }));
+}
+
+export async function updateDocument(documentId: string, input: { content: string; revision: string }): Promise<DocumentItem> {
+  return parseResponse(await authFetch(`${API_BASE}/personal-agent/documents/${documentId}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function getDocument(documentId: string): Promise<{ document: DocumentItem; content: string; editable: boolean }> {
+  return parseResponse(await authFetch(`${API_BASE}/personal-agent/documents/${documentId}`));
+}
+
+export async function replaceDocument(documentId: string, file: File, revision: string): Promise<DocumentItem> {
+  const form = new FormData(); form.append("file", file); form.append("revision", revision);
+  return parseResponse(await authFetch(`${API_BASE}/personal-agent/documents/${documentId}/replace`, { method: "POST", body: form }));
 }
 
 export async function getConversations(): Promise<ConversationsResponse> {
