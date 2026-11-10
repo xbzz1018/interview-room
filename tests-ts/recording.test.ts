@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   LongTranscriptionService,
+  ShortTranscriptionService,
+  emptyServiceSettings,
   RecordingService,
   type CandidateProfilePort,
   type ChatMessage,
@@ -31,6 +33,17 @@ class Replies implements TextGenerationUseCases {
 function task(taskId: string): TaskRecord { return { task_id: taskId, user_id: 'user-a', type: 'recording_review', status: 'running', payload: { session_id: taskId }, result: null, error: null, attempts: 1, created_at: '', updated_at: '' } }
 
 describe('long recording transcription', () => {
+  test('missing speech services give actionable configuration errors', async () => {
+    const settings: ProviderSettingsRepository = {
+      async loadProvider() { return { services: emptyServiceSettings() } }, async saveProvider() {},
+      async loadTraining() { return { num_questions: 5, divergence: 2 } }, async saveTraining() {},
+      async loadLastReindexAt() { return '' }, async saveLastReindexAt() {}, async loadSystem() { return undefined }, async saveSystem() {},
+    }
+    const short = new ShortTranscriptionService(settings, { async transcribe() { throw new Error('must not call external service') } })
+    const long = new LongTranscriptionService(settings, { async transcribe() { throw new Error('must not call external service') } })
+    await expect(short.transcribe(context, new Uint8Array([1]), '.wav')).rejects.toMatchObject({ status: 400, code: 'speech_not_configured' })
+    await expect(long.transcribe(context, new Uint8Array([1]), '.wav')).rejects.toMatchObject({ status: 400, code: 'speech_not_configured' })
+  })
   test('loads per-user credentials and keeps the legacy response payload input', async () => {
     let received = ''
     const settings: ProviderSettingsRepository = {
