@@ -1,8 +1,9 @@
 {
   "name": "@techspar/desktop",
   "version": "0.4.1",
-  "description": "TechSpar AI technical interview training desktop client",
-  "author": "TechSpar",
+  "description": "Interview Room personal technical interview practice desktop client",
+  "author": "xbzz1018",
+  "contributors": [{ "name": "TechSpar contributors" }],
   "private": true,
   "type": "module",
   "main": "dist/main/main.js",
@@ -12,6 +13,7 @@
     "build:preload": "bun build src/preload.ts --target=node --format=cjs --external electron --outfile=dist/preload/preload.cjs",
     "start": "electron .",
     "pack": "electron-builder --dir --config electron-builder.yml",
+    "pack:personal": "electron-builder --dir --config electron-builder.personal.yml",
     "dist": "electron-builder --config electron-builder.yml",
     "dist:mac-arm64": "electron-builder --config electron-builder.yml --mac --arm64",
     "dist:win-x64": "electron-builder --config electron-builder.yml --win --x64"

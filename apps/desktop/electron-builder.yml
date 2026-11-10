@@ -1,6 +1,6 @@
 appId: top.techspar.desktop
-productName: TechSpar
-artifactName: TechSpar-${version}-${os}-${arch}.${ext}
+productName: 面试练习室
+artifactName: Interview-Room-${version}-${os}-${arch}.${ext}
 asar: true
 npmRebuild: false
 directories:
@@ -11,6 +11,16 @@ files:
   - package.json
   - "!node_modules/**/*"
 extraResources:
+  - from: build/icon.png
+    to: brand/app-icon.png
+  - from: ../../docs/third-party/lucide.txt
+    to: licenses/lucide.txt
+  - from: ../../LICENSE
+    to: licenses/project-AGPL-3.0.txt
+  - from: ../../NOTICE.md
+    to: licenses/NOTICE.md
+  - from: ../../frontend/src/resume/LICENSE
+    to: licenses/resume-module-LICENSE.txt
   - from: ../../docs/third-party/meetily.md
     to: licenses/meetily.md
   - from: resources/backend
@@ -23,16 +33,17 @@ extraResources:
       - "**/*"
 mac:
   extendInfo:
-    NSMicrophoneUsageDescription: TechSpar 使用麦克风转写你的回答。
-    NSAudioCaptureUsageDescription: TechSpar 使用系统音频转写会议中对方的发言。
-    NSScreenCaptureUsageDescription: TechSpar 通过系统共享接口获取会议音频，不上传屏幕画面。
+    NSMicrophoneUsageDescription: 面试练习室 使用麦克风转写你的回答。
+    NSAudioCaptureUsageDescription: 面试练习室 使用系统音频转写会议中对方的发言。
+    NSScreenCaptureUsageDescription: 面试练习室 通过系统共享接口获取会议音频，不上传屏幕画面。
   category: public.app-category.education
   icon: build/icon.png
   target:
     - dmg
     - zip
 win:
-  icon: build/icon.png
+  executableName: TechSpar
+  icon: build/icon.ico
   target:
     - nsis
 linux:

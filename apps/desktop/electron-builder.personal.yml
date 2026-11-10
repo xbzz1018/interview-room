@@ -1,0 +1,11 @@
+extends: ./electron-builder.yml
+appId: local.techspar.personal
+productName: 面试练习室
+artifactName: Interview-Room-Personal-${version}-${os}-${arch}.${ext}
+win:
+  executableName: TechSpar Personal
+directories:
+  output: ../../dist/desktop-interview-room-themes
+extraMetadata:
+  name: techspar-personal
+  productName: 面试练习室

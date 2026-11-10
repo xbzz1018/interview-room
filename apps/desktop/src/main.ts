@@ -4,14 +4,16 @@ import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { BackendSupervisor, type BackendLaunch, type BackendReady } from './backend-supervisor.ts'
-import { DESKTOP_AUDIO_SETTINGS_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
+import { DESKTOP_APPEARANCE_READ_CHANNEL, DESKTOP_APPEARANCE_WRITE_CHANNEL, DESKTOP_AUDIO_SETTINGS_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
 import { configureAudioPermissions, openAudioSettings, sameOrigin } from './audio-permissions.ts'
 import { loadOrCreateRuntimeSecrets } from './runtime-secrets.ts'
+import { AppearanceStore } from './appearance.ts'
 
 app.enableSandbox()
 if (process.env.TECHSPAR_DESKTOP_USER_DATA_DIR) app.setPath('userData', resolve(process.env.TECHSPAR_DESKTOP_USER_DATA_DIR))
 const singleInstance = app.requestSingleInstanceLock()
 if (!singleInstance) app.quit()
+const appearance = new AppearanceStore(join(app.getPath('userData'), 'appearance.json'))
 
 const sourceDir = fileURLToPath(new URL('.', import.meta.url))
 const smokeMode = process.argv.includes('--smoke-test')
@@ -89,6 +91,8 @@ function registerIpc(): void {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow?.webContents.mainFrame || !event.senderFrame?.url || !sameOrigin(event.senderFrame.url, rendererOrigin)) throw new Error('Untrusted IPC sender')
   }
   ipcMain.handle(DESKTOP_AUDIO_SETTINGS_CHANNEL, async (event, kind: unknown) => { assertTrusted(event); await openAudioSettings(kind) })
+  ipcMain.handle(DESKTOP_APPEARANCE_READ_CHANNEL, async (event) => { assertTrusted(event); return appearance.read() })
+  ipcMain.handle(DESKTOP_APPEARANCE_WRITE_CHANNEL, async (event, theme: unknown) => { assertTrusted(event); await appearance.write(theme) })
   ipcMain.handle(DESKTOP_RUNTIME_CHANNEL, (event) => {
     assertTrusted(event)
     return runtimeInfo()
@@ -114,9 +118,10 @@ async function createWindow(): Promise<void> {
     height: 920,
     minWidth: 1060,
     minHeight: 700,
-    backgroundColor: '#09090b',
+    backgroundColor: ({ navy: '#f3f5f8', teal: '#131a20', wine: '#f7f4ed' })[await appearance.read() || 'navy'],
     show: false,
-    title: 'TechSpar',
+    title: '面试练习室',
+    icon: app.isPackaged ? join(process.resourcesPath, 'brand', 'app-icon.png') : join(projectRoot(), 'apps', 'desktop', 'build', 'icon.png'),
     webPreferences: {
       preload: resolve(sourceDir, '..', 'preload', 'preload.cjs'),
       contextIsolation: true,
@@ -138,7 +143,7 @@ async function createWindow(): Promise<void> {
     event.preventDefault()
     if (url.startsWith('https://')) void shell.openExternal(url)
   })
-  await window.loadURL(process.env.TECHSPAR_RENDERER_URL || backendReady!.origin)
+  await window.loadURL(new URL('/login', process.env.TECHSPAR_RENDERER_URL || backendReady!.origin).href)
 }
 
 async function smokeTest(): Promise<void> {
@@ -152,7 +157,7 @@ async function boot(): Promise<void> {
   await app.whenReady()
   backend = new BackendSupervisor(await backendLaunch(), (message) => {
     if (quitting) return
-    dialog.showErrorBox('TechSpar 服务意外退出', message)
+    dialog.showErrorBox('面试练习室服务意外退出', message)
     app.quit()
   })
   backendReady = await backend.start()
@@ -168,11 +173,11 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 app.on('before-quit', (event) => {
   if (quitting || !backend) return
   event.preventDefault(); quitting = true
-  void backend.stop().finally(() => app.quit())
+  void Promise.all([backend.stop(), appearance.flush()]).finally(() => app.quit())
 })
 
 void boot().catch((error) => {
   const message = error instanceof Error ? error.stack || error.message : String(error)
-  dialog.showErrorBox('TechSpar 启动失败', message)
+  dialog.showErrorBox('面试练习室启动失败', message)
   app.exit(1)
 })

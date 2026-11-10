@@ -9,6 +9,9 @@ export type DesktopRuntimeInfo = {
 
 export const DESKTOP_RUNTIME_CHANNEL = 'techspar:runtime-info'
 export const DESKTOP_AUDIO_SETTINGS_CHANNEL = 'techspar:audio-settings'
+export type DesktopAppearanceTheme = 'navy' | 'teal' | 'wine'
+export const DESKTOP_APPEARANCE_READ_CHANNEL = 'techspar:appearance-read'
+export const DESKTOP_APPEARANCE_WRITE_CHANNEL = 'techspar:appearance-write'
 
 export type DesktopBootstrapSession = {
   token: string
