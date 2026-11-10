@@ -53,6 +53,37 @@ async function fixture() {
 }
 
 describe('retryable profile memory projection', () => {
+  test('validates supplied review insights and restores failed memory without another model call', async () => {
+    const f = await fixture(); f.fail('storage')
+    const input = { userId: 'user-a', session: session(), extraction }
+    await expect(f.service.afterReview(input)).rejects.toThrow('synthetic storage outage')
+    expect(f.calls()).toBe(0)
+    expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
+    f.fail('none')
+    const restarted = new ProfileService({ ...f.deps, repository: new FileCandidateProfileRepository(f.root) })
+    // A resumed task does not need the original combined generation in memory.
+    expect(await restarted.afterReview({ userId: 'user-a', session: session() })).toEqual(extraction)
+    expect(f.calls()).toBe(0)
+    expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+  })
+
+  test('re-extracts invalid supplied insights instead of applying unvalidated profile changes', async () => {
+    const f = await fixture()
+    const complete = f.deps.ai.complete
+    let retryPrompt = ''
+    f.deps.ai.complete = async (context, messages, options) => {
+      retryPrompt = messages.map(message => message.content).join('\n')
+      return complete(context, messages, options)
+    }
+    expect(await f.service.afterReview({ userId: 'user-a', session: session(), extraction: { ...extraction, avg_score: 99 } })).toEqual(extraction)
+    expect(f.calls()).toBe(1)
+    expect(retryPrompt).toContain('avg_score: must be <= 10')
+    expect(retryPrompt).toContain('不要重复相同的格式错误')
+    expect(retryPrompt).toContain('没有足够证据评分时省略')
+    expect((await f.repository.load('user-a')).stats.score_history.at(-1)?.avg_score).toBe(7)
+  })
+
   for (const patch of [
     { avg_score: 11 }, { dimension_scores: { technical_depth: '8' } },
     { weak_points: [{ point: '知识点', confidence: 2 }] },
@@ -78,9 +109,14 @@ describe('retryable profile memory projection', () => {
   test('retries a malformed extraction then writes valid profile and memory exactly once', async () => {
     const f = await fixture()
     let calls = 0
-    f.deps.ai.complete = async () => JSON.stringify(++calls === 1 ? { ...extraction, avg_score: '7' } : extraction)
+    const retryPrompts: string[] = []
+    f.deps.ai.complete = async (_context, messages) => {
+      retryPrompts.push(messages.map(message => message.content).join('\n'))
+      return JSON.stringify(++calls === 1 ? { ...extraction, avg_score: '7' } : extraction)
+    }
     await f.service.afterReview({ userId: 'user-a', session: session() })
     expect(calls).toBe(2)
+    expect(retryPrompts[1]).toContain('avg_score: expected a finite number')
     expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
     expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
   })
@@ -309,7 +345,12 @@ for (const mode of ['resume', 'recording'] as const) {
           return { ...extraction, avg_score: isOld ? 2 : 9, session_summary: isOld ? 'stale extraction' : 'fresh extraction' }
         }
         f.deps.ai.complete = async context => JSON.stringify(await extract(context))
-        const profile: CandidateProfilePort = implementation === 'real' ? f.service : {
+        // Exercise cancellation inside extraction/projection independently of
+        // the optional combined report generator.
+        const profile: CandidateProfilePort = implementation === 'real' ? {
+          summary: f.service.summary.bind(f.service), targetRole: f.service.targetRole.bind(f.service), updateTargetRole: f.service.updateTargetRole.bind(f.service),
+          afterReview: f.service.afterReview.bind(f.service),
+        } : {
           async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {},
           afterReview: ({ context }) => extract(context),
         }
@@ -318,7 +359,7 @@ for (const mode of ['resume', 'recording'] as const) {
           async complete() {
             const summary = ++reviews === 1 ? 'old review' : 'fresh review'
             return mode === 'resume' ? summary : JSON.stringify({ topics_covered: [], overall: { avg_score: 9, summary } })
-          }, async *stream() {},
+          }, async *stream() { reviews++; yield 'saved streamed review' },
         }
         const interview = new InterviewService({
           sessions, tasks: oldQueue, ai, profile,
@@ -345,7 +386,7 @@ for (const mode of ['resume', 'recording'] as const) {
           const freshProfile = await f.repository.load('user-a')
           const freshMemories = await f.vectors.listProfileMemories({ userId: 'user-a' })
           expect(fresh?.meta.profile_extract_failed).toBeFalse()
-          if (!profileOnly) expect(fresh?.review).toContain('fresh review')
+          if (!profileOnly) expect(fresh?.review).toContain(mode === 'resume' ? 'saved streamed review' : 'fresh review')
           expect(oldContext!.signal.aborted).toBeFalse()
           release.resolve()
           await finished.promise

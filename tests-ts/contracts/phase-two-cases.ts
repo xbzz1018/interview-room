@@ -20,6 +20,8 @@ export const phaseTwoCases: ResponseCase[] = [
   { operation: 'POST /api/interview/review/{session_id}/generate', service: 'interview', useCase: 'generateReview', schema: contracts.InterviewReviewSubmissionResponseSchema },
   { operation: 'GET /api/interview/session/{session_id}/resume', service: 'interview', useCase: 'resume', schema: contracts.InterviewResumeResponseSchema },
   { operation: 'POST /api/interview/reference-answer', service: 'interview', useCase: 'referenceAnswer', schema: contracts.ReferenceAnswerResponseSchema.strict(), body: { session_id: 'topic-session-1', question_id: 1 } },
+  { operation: 'POST /api/interview/compare-answer', service: 'interview', useCase: 'compareAnswer', schema: contracts.CompareAnswerResponseSchema, body: { session_id: 'resume-session-1', question_id: 'resume-turn-1', answer: '合成重答', request_id: 'eae3be97-42b6-4a30-a1fb-312d1eac67ee' } },
+  { operation: 'GET /api/interview/training-progress', service: 'interview', useCase: 'trainingProgress', schema: contracts.TrainingProgressResponseSchema },
   { operation: 'GET /api/interview/review/{session_id}', service: 'interview', useCase: 'review', schema: contracts.InterviewSessionResponseSchema },
   { operation: 'GET /api/tasks/{task_id}', service: 'interview', useCase: 'task', schema: contracts.TaskStatusResponseSchema },
   { operation: 'GET /api/interview/history', service: 'interview', useCase: 'history', schema: contracts.InterviewHistoryResponseSchema },

@@ -10,7 +10,9 @@ import { defaultProfile, type CandidateProfile, type PendingProfileMemory, type 
 import type { ProfileDependencies, ProfileMemoryEntry, ProfileMemorySearchResult, ProfileUseCases } from './ports.ts'
 
 const INFER_ROLE_PROMPT = `根据以下简历内容，推断候选人最可能应聘的岗位名称。给出一个具体岗位，12 个汉字以内；学生可带实习生或校招后缀。只返回岗位名称，不要解释。\n\n{resume}`
-const EXTRACT_PROMPT = `你是面试教练分析引擎。根据本次面试记录提取结构化洞察。不要把表达习惯混入知识弱点，不得编造记录中没有的事实。\n\n模式：{mode}\n领域：{topic}\n对话：\n{transcript}\n\n逐题评分：\n{scores}\n\n现有行为信号（尽量复用 ID）：\n{existing_behavior_signals}\n\n复盘：\n{review}\n\n只返回 JSON：{"session_summary":"摘要","weak_points":[{"point":"具体知识薄弱点","topic":"领域"}],"strong_points":[{"point":"具体知识强项","topic":"领域"}],"behavior_signals":[{"action":"ADD|UPDATE|IMPROVE|NOOP","id":"reasoning.example","namespace":"reasoning","polarity":"negative","description":"行为描述","snippet":"本次新证据","evidence_snippet":"改善证据"}],"topic_mastery":{"notes":"掌握情况"},"avg_score":7,"dimension_scores":{"technical_depth":7,"project_articulation":7,"communication":7,"problem_solving":7}}。仅 resume 模式返回四维 dimension_scores，其他模式省略。avg_score 为有效维度的平均分，保留一位小数。行为信号按 action 提供内容：ADD 必须有非空 description 和 snippet；UPDATE 必须有非空 snippet；IMPROVE 必须有非空 evidence_snippet；NOOP 不应用变更。各 action 不适用的文本字段可以省略或填空字符串，但不能使用 null、对象或数组。`
+const EXTRACTION_FORMAT = `{"session_summary":"摘要","weak_points":[{"point":"具体知识薄弱点","topic":"领域"}],"strong_points":[{"point":"具体知识强项","topic":"领域"}],"behavior_signals":[{"action":"ADD|UPDATE|IMPROVE|NOOP","id":"reasoning.example","namespace":"reasoning","polarity":"negative","description":"行为描述","snippet":"本次新证据","evidence_snippet":"改善证据"}],"topic_mastery":{"notes":"掌握情况"},"avg_score":7,"dimension_scores":{"technical_depth":7,"project_articulation":7,"communication":7,"problem_solving":7}}。仅 resume 模式返回四维 dimension_scores，其他模式省略。avg_score 为有效维度的平均分，保留一位小数。行为信号按 action 提供内容：ADD 必须有非空 description 和 snippet；UPDATE 必须有非空 snippet；IMPROVE 必须有非空 evidence_snippet；NOOP 不应用变更。各 action 不适用的文本字段可以省略或填空字符串，但不能使用 null、对象或数组。`
+const EXTRACTION_EMPTY_RULES = '没有足够证据评分时省略 avg_score 和 dimension_scores，不要填 null 或编造分数。weak_points、strong_points、behavior_signals 必须是数组，没有条目时使用 []；topic_mastery.notes 必须是字符串，没有内容时省略。所有行为信号的文本字段只能使用字符串，不适用时省略，不能使用 null。'
+const EXTRACT_PROMPT = `你是面试教练分析引擎。根据本次面试记录提取结构化洞察。不要把表达习惯混入知识弱点，不得编造记录中没有的事实。\n\n模式：{mode}\n领域：{topic}\n对话：\n{transcript}\n\n逐题评分：\n{scores}\n\n现有行为信号（尽量复用 ID）：\n{existing_behavior_signals}\n\n复盘：\n{review}\n\n只返回 JSON：${EXTRACTION_FORMAT}\n${EXTRACTION_EMPTY_RULES}`
 const RETROSPECTIVE_PROMPT = `你是面试教练，请基于「{topic_name}」的多次训练历史生成一份适合窄卡片阅读的 Markdown 回顾。总结整体诊断、逐题得分与依据、进步趋势、稳定强项、反复薄弱点，并给出下一轮训练计划。每个判断必须能在历史中找到依据，不得编造训练记录之外的事实。
 
 当前掌握度：{mastery}
@@ -336,7 +338,7 @@ function sessionScore(session: InterviewSession): { score?: number; coverage: nu
 }
 
 function updateMastery(profile: CandidateProfile, session: InterviewSession, extraction: Record<string, unknown>, now: string): void {
-  if (!session.topic) return
+  if (!session.topic || session.meta.training_mode === 'coach') return
   const rawMastery = object(extraction.topic_mastery)
   const mastery = Object.keys(object(rawMastery[session.topic])).length ? object(rawMastery[session.topic]) : rawMastery
   const actual = sessionScore(session)
@@ -367,6 +369,7 @@ function updateStats(profile: CandidateProfile, session: InterviewSession, extra
   const scoredAnswers = session.scores.filter((raw) => number(raw.score) !== undefined).length
   const answerCount = scoredAnswers || session.transcript.filter((message) => message.role === 'user' && message.content.trim()).length
   stats.total_answers = Number(stats.total_answers || 0) + answerCount
+  if (session.meta.training_mode === 'coach') { stats.coach_sessions = Number(stats.coach_sessions || 0) + 1; return }
 
   const overall = object(session.overall)
   const numericScores = session.scores.map((raw) => number(raw.score)).filter((value): value is number => value !== undefined)
@@ -661,7 +664,12 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     if (created.length) await this.appendMemories(userId, created.map((point) => ({ chunkType: 'weak_point', content: point.point, topic: point.topic ?? undefined, metadata: { source: 'consolidated' } })), now, context)
   }
 
-  async afterReview(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown>> {
+  async reviewExtractionPrompt(userId: string): Promise<string> {
+    const profile = await this.profile(userId)
+    return `同时根据上文的本次简历面试对话和过程评分提取画像洞察，放入 profile_extraction 字段。不要把表达习惯混入知识弱点；不得编造证据，没有记录的强弱项和行为信号使用空数组。\n\n现有行为信号（尽量复用 ID）：\n${behaviorSummary(profile)}\n\nprofile_extraction 的结构与校验规则：\n${EXTRACTION_FORMAT}\n${EXTRACTION_EMPTY_RULES}`
+  }
+
+  async afterReview(input: { userId: string; session: InterviewSession; context?: RequestContext; extraction?: unknown }): Promise<Record<string, unknown>> {
     const context = this.context(input.userId, input.session.session_id, input.context)
     await assertContextActive(context)
     const before = await this.profile(input.userId)
@@ -672,15 +680,25 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     }
     const transcript = input.session.transcript.map((message) => `${message.role === 'user' ? '候选人' : '面试官'}: ${message.content}`).join('\n')
     let extraction: Record<string, unknown> | undefined
+    let correction: string | undefined
+    if (input.extraction !== undefined) {
+      try { extraction = validateProfileExtraction(input.extraction) }
+      catch (error) { if (error instanceof StructuredOutputError) correction = error.message }
+    }
     for (let attempt = 0; attempt < 2 && !extraction; attempt += 1) {
       try {
-        const parsed = parseJsonResponse(await this.deps.ai.complete(context, [{ role: 'system', content: '你是面试分析引擎。只返回 JSON。' }, { role: 'user', content: fill(EXTRACT_PROMPT, { mode: input.session.mode, topic: input.session.topic || '综合', transcript, scores: JSON.stringify(input.session.scores), existing_behavior_signals: behaviorSummary(before), review: input.session.review || '' }) }], STRUCTURED_CHAT_OPTIONS))
+        const prompt = fill(EXTRACT_PROMPT, { mode: `${input.session.mode} / ${input.session.meta.training_mode === 'coach' ? '教练练习（受辅助，不给独立作答分数）' : '严格模拟'}`, topic: input.session.topic || '综合', transcript, scores: JSON.stringify(input.session.scores), existing_behavior_signals: behaviorSummary(before), review: input.session.review || '' })
+        const parsed = parseJsonResponse(await this.deps.ai.complete(context, [{ role: 'system', content: '你是面试分析引擎。只返回 JSON。' }, { role: 'user', content: `${prompt}${correction ? `\n\n上次输出未通过本地校验：${correction}。请根据上述证据重新生成并修正此字段，不要重复相同的格式错误。` : ''}` }], STRUCTURED_CHAT_OPTIONS))
         extraction = validateProfileExtraction(parsed)
       }
-      catch { await assertContextActive(context) /* retry once unless cancelled */ }
+      catch (error) {
+        await assertContextActive(context)
+        if (error instanceof StructuredOutputError) correction = error.message
+      }
     }
     await assertContextActive(context)
-    if (!extraction) throw new Error('画像提取失败')
+    if (!extraction) throw new Error(`画像提取失败${correction ? `（${correction}）` : ''}`)
+    if (input.session.meta.training_mode === 'coach') { delete extraction.avg_score; delete extraction.dimension_scores; delete extraction.topic_mastery }
     const now = new Date().toISOString()
     const weak = (Array.isArray(extraction.weak_points) ? extraction.weak_points : []).map(object).filter((item) => text(item.point))
     const strong = (Array.isArray(extraction.strong_points) ? extraction.strong_points : []).map(object).filter((item) => text(item.point))

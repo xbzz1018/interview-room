@@ -50,6 +50,24 @@ describe('real services through HTTP and SQLite', () => {
     expect<unknown>(h.remaining).toEqual([])
   })
 
+  test('legacy resume review HTTP exposes reference questions without requiring a knowledge topic', async () => {
+    const h = await setup(['## 回答框架\n结合事实说明验证过程。'])
+    const session = await sessionFixture()
+    await h.seedSession({ ...session, session_id: 'legacy-resume', mode: 'resume', topic: null, questions: [], reference_answers: {}, transcript: [
+      { role: 'assistant', content: '如何验证事务？' },
+      { role: 'user', content: '用并发测试验证唯一约束。' },
+    ] })
+    const reviewed = await json(await h.request('/api/interview/review/legacy-resume'))
+    expect<unknown>(reviewed.questions).toEqual([{ id: 'resume-turn-1', question: '如何验证事务？' }])
+    const body = { session_id: 'legacy-resume', question_id: reviewed.questions[0].id }
+    for (const cached of [false, true]) {
+      expect<unknown>(await json(await h.request('/api/interview/reference-answer', 'POST', body))).toEqual({ reference_answer: '## 回答框架\n结合事实说明验证过程。', cached })
+    }
+    const reopened = await json(await h.request('/api/interview/review/legacy-resume'))
+    expect<unknown>(reopened.reference_answers).toEqual({ 'resume-turn-1': '## 回答框架\n结合事实说明验证过程。' })
+    expect<unknown>(h.remaining).toEqual([])
+  })
+
   test('validates generated JD preview and keeps supplied partial preview_data intact when starting', async () => {
     const previewEntry = phaseTwoCases.find((entry) => entry.useCase === 'previewJob')!
     const expected = JobPrepPreviewResponseSchema.parse(await caseFixture(previewEntry))
@@ -96,9 +114,10 @@ describe('real services through HTTP and SQLite', () => {
   })
 
   test('starts, chats and resumes a persisted resume interview, including its finished branch', async () => {
-    const h = await setup(['请做自我介绍。', '请介绍一个项目。'])
+    const h = await setup(['请介绍一个项目。'])
     const started = await json(await h.request('/api/interview/start', 'POST', { mode: 'resume', target_role: '后端工程师' }))
-    expect<unknown>(started).toEqual({ session_id: 'generated-session-1', mode: 'resume', target_role: '后端工程师', job_description: '', message: '请做自我介绍。' })
+    expect<unknown>(started).toEqual({ session_id: 'generated-session-1', mode: 'resume', target_role: '后端工程师', job_description: '', message: expect.stringContaining('自我介绍') })
+    expect(h.remaining).toEqual(['请介绍一个项目。'])
     expect<unknown>(started).not.toHaveProperty('topic')
     const chat = await json(await h.request('/api/interview/chat', 'POST', { session_id: started.session_id, message: '合成自我介绍' }))
     expect<unknown>(chat).toEqual({ session_id: started.session_id, message: '请介绍一个项目。', is_finished: false })

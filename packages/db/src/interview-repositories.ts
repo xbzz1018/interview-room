@@ -263,6 +263,20 @@ export class BunInterviewSessionRepository implements InterviewSessionRepository
     return transaction()
   }
 
+  async saveTrainingAttempt(sessionId: string, userId: string, attempt: import('@techspar/core').TrainingAttempt): Promise<boolean> {
+    return this.sqlite.transaction(() => {
+      const row = this.sqlite.query<{ meta: string | null }, { $id: string; $user: string }>('SELECT meta FROM sessions WHERE session_id=$id AND user_id=$user').get({ $id: sessionId, $user: userId })
+      if (!row) return false
+      const meta = json<Record<string, unknown>>(row.meta, {})
+      const attempts = Array.isArray(meta.training_attempts) ? meta.training_attempts : []
+      if (attempts.some((value) => value?.attempt_id === attempt.attempt_id)) return false
+      if (attempts.length >= 50) throw new Error('本轮已保存 50 次重答，请开启新一轮练习。')
+      meta.training_attempts = [...attempts, attempt]
+      this.sqlite.query('UPDATE sessions SET meta=$meta, updated_at=CURRENT_TIMESTAMP WHERE session_id=$id AND user_id=$user').run({ $meta: JSON.stringify(meta), $id: sessionId, $user: userId })
+      return true
+    }).immediate()
+  }
+
   async list(input: { userId: string; limit: number; offset: number; mode?: InterviewMode; topic?: string }): Promise<{ items: SessionSummary[]; total: number }> {
     const conditions = ["user_id = $userId", "(status != 'ongoing' OR transcript != '[]' OR (mode = 'jd_prep' AND questions != '[]'))"]
     if (input.mode) conditions.push('mode = $mode')

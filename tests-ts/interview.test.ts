@@ -93,6 +93,80 @@ function interviewDependencies(input: {
 }
 
 describe('interview persistence', () => {
+  test('legacy resume reviews expose answered questions and generate cached, evidence-bound reference answers', async () => {
+    const path = await databasePath()
+    const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path)
+    const ai = new FakeAi(['## 回答框架\n先说明事实，再解释验证方法。'])
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai }))
+    await service.start(context, { mode: 'resume', target_role: '后端工程师', job_description: '负责数据库与 API' })
+    await sessions.appendMessage('generated-session', 'user-a', 'user', '我用 AI 辅助实现，负责测试与复核。')
+    await sessions.appendMessage('generated-session', 'user-a', 'assistant', '如何验证并发安全？')
+    await sessions.appendMessage('generated-session', 'user-a', 'user', '用并发请求和唯一约束验证。')
+    await sessions.appendMessage('generated-session', 'user-a', 'assistant', '还遇到什么问题？')
+    await sessions.saveReview({ sessionId: 'generated-session', userId: 'user-a', review: '# 已保存复盘' })
+    const review = await service.review(context, 'generated-session')
+    expect(review.questions.map(question => question.id)).toEqual(['resume-turn-1', 'resume-turn-3'])
+    expect((await sessions.get('generated-session', 'user-a'))!.questions).toEqual([])
+    const result = await service.referenceAnswer(context, 'generated-session', 'resume-turn-3')
+    expect(result).toEqual({ reference_answer: '## 回答框架\n先说明事实，再解释验证方法。', cached: false })
+    const prompt = ai.calls[0]!
+    expect(prompt[0]!.content).toContain('不编造成候选人做过的事')
+    expect(JSON.parse(prompt[1]!.content)).toMatchObject({ target_role: '后端工程师', question: '如何验证并发安全？', candidate_answer: '用并发请求和唯一约束验证。' })
+    expect(await service.referenceAnswer(context, 'generated-session', 'resume-turn-3')).toMatchObject({ cached: true })
+    expect(ai.calls).toHaveLength(1)
+    await expect(service.referenceAnswer({ ...context, userId: 'another-user' }, 'generated-session', 'resume-turn-3')).rejects.toThrow('Session not found')
+    await expect(service.referenceAnswer(context, 'generated-session', 'resume-turn-5')).rejects.toThrow('Question not found')
+    sessions.close(); states.close()
+  })
+
+  test('failed generation retries the pending answer once and blocks overlapping turns and ending', async () => {
+    const path = await databasePath()
+    const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path)
+    let release!: (text: string) => void
+    let entered!: () => void
+    const started = new Promise<void>(resolve => { entered = resolve })
+    let calls = 0
+    const ai: TextGenerationUseCases = {
+      async complete() {
+        calls++
+        if (calls === 1) throw new Error('temporary upstream failure')
+        entered()
+        return new Promise<string>(resolve => { release = resolve })
+      },
+      async *stream() {},
+    }
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai }))
+    await service.start(context, { mode: 'resume', target_role: '后端工程师' })
+    await expect(service.chat(context, 'generated-session', '我的回答')).rejects.toThrow('temporary upstream failure')
+    const pending = service.chat(context, 'generated-session', '我的回答')
+    await started
+    await expect(service.chat(context, 'generated-session', '重复提交')).rejects.toThrow('面试官正在处理')
+    await expect(service.end(context, 'generated-session', [])).rejects.toThrow('面试官仍在回复')
+    release('请具体说明验证方法。')
+    await pending
+    const session = (await sessions.get('generated-session', 'user-a'))!
+    expect(session.transcript.map(message => message.role)).toEqual(['assistant', 'user', 'assistant'])
+    expect((await states.load('generated-session', 'user-a'))!.messages).toHaveLength(3)
+    await sessions.updateStatus('generated-session', 'user-a', 'ended')
+    await expect(service.chat(context, 'generated-session', '不能再提交')).rejects.toThrow('这轮面试已结束')
+    sessions.close(); states.close()
+  })
+
+  test('ongoing resume interviews cannot request reference answers', async () => {
+    const path = await databasePath()
+    const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path)
+    const ai = new FakeAi([])
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai }))
+    await service.start(context, { mode: 'resume', target_role: '后端工程师' })
+    await sessions.appendMessage('generated-session', 'user-a', 'user', '我的经历')
+    await expect(service.referenceAnswer(context, 'generated-session', 'resume-turn-1')).rejects.toThrow('请结束面试')
+    expect(ai.calls).toHaveLength(0)
+    sessions.close(); states.close()
+  })
+
   test('keeps session JSON compatible and user-scoped', async () => {
     const path = await databasePath()
     const sessions = new BunInterviewSessionRepository(path)
@@ -157,17 +231,24 @@ describe('resume interview state machine', () => {
     })
   }
 
-  test('injects target role and JD and persists them in state', async () => {
+  test('starts locally without a model call and uses the full role, JD and resume on the first follow-up', async () => {
     const path = await databasePath()
     const states = new BunResumeInterviewStateRepository(path)
     states.initialize()
-    const ai = new FakeAi(['欢迎，请做自我介绍。'])
+    const ai = new FakeAi(['请介绍你的订单服务。'])
     const engine = new ResumeInterviewEngine(ai, states, profile)
     const started = await engine.start(context, { sessionId: 'resume-1', targetRole: '后端开发工程师', jobDescription: '负责高并发 API，要求 PostgreSQL 和系统设计。', resumeContext: '做过订单服务' })
+    expect(started.opening).toContain('后端开发工程师')
+    expect(started.opening).toContain('自我介绍')
+    expect(ai.calls).toHaveLength(0)
+    expect(started.state.messages).toEqual([{ role: 'assistant', content: started.opening }])
     await states.save('resume-1', 'user-a', started.state)
+    await engine.turn(context, 'resume-1', started.state, '我负责订单服务的接口开发。')
     const prompt = ai.calls[0]![0]!.content
     expect(prompt).toContain('后端开发工程师')
     expect(prompt).toContain('负责高并发 API')
+    expect(prompt).toContain('做过订单服务')
+    expect(ai.calls[0]!.at(-1)?.content).toBe('我负责订单服务的接口开发。')
     expect(await states.load('resume-1', 'user-a')).toMatchObject({ target_role: '后端开发工程师', job_description: '负责高并发 API，要求 PostgreSQL 和系统设计。' })
     states.close()
   })
@@ -357,16 +438,14 @@ describe('interview application service', () => {
     sessions.close(); states.close()
   })
 
-  test('persists resume extraction scores in the session and profile history', async () => {
+  test.each(['valid', 'invalid', 'missing'] as const)('persists streamed report before profile extraction (%s response)', async (insights) => {
     const path = await databasePath()
     const root = join(path, '..')
     const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
     const states = new BunResumeInterviewStateRepository(path); states.initialize()
     const dimensions = { technical_depth: 8, project_articulation: 7, communication: 6.5, problem_solving: 7.5 }
-    const ai = new FakeAi([
-      '# 简历面试复盘\n整体表现稳定。',
-      JSON.stringify({ session_summary: '表现稳定', weak_points: [], strong_points: [], behavior_signals: [], topic_mastery: {}, avg_score: 7.3, dimension_scores: dimensions }),
-    ])
+    const extraction = { session_summary: '表现稳定', weak_points: [], strong_points: [], behavior_signals: [], topic_mastery: {}, avg_score: 7.3, dimension_scores: dimensions }
+    const ai = new FakeAi(['# 简历面试复盘\n整体表现稳定。', ...(insights === 'invalid' ? [JSON.stringify({ ...extraction, avg_score: 99 })] : insights === 'missing' ? ['{}'] : []), JSON.stringify(extraction)])
     const tasks = taskDispatcher()
     const knowledgeStore = emptyKnowledgeStore()
     const resume = interviewDependencies({ sessions, states, ai }).resume
@@ -384,12 +463,42 @@ describe('interview application service', () => {
     })
     await service.runReviewTask({ task_id: 'resume-metrics', user_id: 'user-a', type: 'resume_review', status: 'running', payload: { session_id: 'resume-metrics' }, result: null, error: null, attempts: 1, created_at: '', updated_at: '' })
 
+    expect(ai.calls).toHaveLength(insights === 'valid' ? 2 : 3)
     expect(ai.calls[1]![1]!.content).toContain('dimension_scores')
-    expect(await sessions.get('resume-metrics', 'user-a')).toMatchObject({ overall: { avg_score: 7.3, dimension_scores: dimensions } })
+    expect(ai.calls[0]![0]!.content).toContain('我使用分层架构并做了压测')
+    expect(ai.options[1]?.jsonMode).toBeTrue()
+    expect(await sessions.get('resume-metrics', 'user-a')).toMatchObject({ review: '# 简历面试复盘\n整体表现稳定。', meta: { profile_extract_failed: false }, overall: { avg_score: 7.3, dimension_scores: dimensions } })
     const savedProfile = await repository.load('user-a')
     expect(savedProfile.stats.score_history.at(-1)).toMatchObject({ mode: 'resume', avg_score: 7.3, dimension_scores: dimensions })
     expect(savedProfile.stats.dimension_scores).toEqual(dimensions)
     sessions.close(); states.close(); vectors.close()
+  })
+
+  test('does not publish a streamed report after its task loses ownership during generation', async () => {
+    const path = await databasePath()
+    const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path); states.initialize()
+    const controller = new AbortController()
+    let release!: (text: string) => void
+    let entered!: () => void
+    const pending = new Promise<string>(resolve => { release = resolve })
+    const started = new Promise<void>(resolve => { entered = resolve })
+    const ai: TextGenerationUseCases = { async complete() { throw new Error('unexpected complete') }, async *stream() { entered(); yield await pending } }
+    let profileWrites = 0
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai, candidateProfile: {
+      ...profile, async reviewExtractionPrompt() { return '提取结构化洞察。' }, async afterReview() { profileWrites++; return {} },
+    } }))
+    try {
+      await sessions.create({ sessionId: 'cancelled', userId: 'user-a', mode: 'resume' })
+      await states.save('cancelled', 'user-a', { messages: [], eval_history: [], phase: 'technical', phase_question_count: 0, resume_context: '合成简历', target_role: '后端', job_description: '', questions_asked: [], is_finished: false, last_eval: {} })
+      const result = service.runReviewTask({ task_id: 'cancelled', user_id: 'user-a', type: 'resume_review', status: 'running', payload: {}, result: null, error: null, attempts: 1, created_at: '', updated_at: '', signal: controller.signal }).catch(error => error)
+      await started
+      controller.abort(new Error('lease lost'))
+      release('# 已失效的报告')
+      expect(await result).toMatchObject({ message: 'lease lost' })
+      expect((await sessions.get('cancelled', 'user-a'))?.review).toBeNull()
+      expect(profileWrites).toBe(0)
+    } finally { release(''); sessions.close(); states.close() }
   })
 })
 
@@ -565,4 +674,94 @@ test('retries Copilot snapshots using copilot_review and exposes their history a
     expect(await service.task(context, 'copilot-retry')).toMatchObject({ type: 'copilot_review', status: 'pending' })
     expect(await service.history(context, { mode: 'copilot' })).toMatchObject({ total: 1, items: [{ mode: 'copilot' }] })
   } finally { sessions.close(); states.close() }
+})
+
+
+describe('personal interview training loop', () => {
+  test('freezes selected materials and mode while respecting explicit resume opt-out', async () => {
+    const path = await databasePath(); const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path); states.initialize()
+    const ai = new FakeAi(['继续说说项目职责。'])
+    let material = '项目证据版本一'
+    const deps = interviewDependencies({ sessions, states, ai })
+    deps.resume.text = async () => '不应使用的默认简历'
+    deps.materials = { async documentText(_ctx, ids) { return ids.map((id) => ({ document_id: id, filename: id + '.md', content: material, updated_at: 'revision-1' })) } }
+    const service = new InterviewService(deps)
+    try {
+      const started = await service.start(context, { mode: 'resume', target_role: '后端', use_resume: false, training_mode: 'coach', material_document_ids: ['project'] })
+      material = '项目证据版本二'
+      await service.chat(context, started.session_id, '我来介绍本人职责。')
+      const state = await states.load(started.session_id, 'user-a')
+      expect(state?.resume_context).toContain('项目证据版本一')
+      expect(state?.resume_context).not.toContain('不应使用的默认简历')
+      expect(state?.resume_context).not.toContain('版本二')
+      expect(ai.calls[0]?.[0]?.content).toContain('教练练习')
+      expect((await service.resume(context, started.session_id)).meta).toMatchObject({ training_mode: 'coach', selected_materials: [{ document_id: 'project', revision: 'revision-1' }] })
+    } finally { sessions.close(); states.close() }
+  })
+
+  test('makes a partial report visible and reuses the saved report after profile synchronization fails', async () => {
+    const path = await databasePath(); const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path); states.initialize()
+    const gate = Promise.withResolvers<void>(); const visible = Promise.withResolvers<void>()
+    let streams = 0; let profileCalls = 0
+    const ai: TextGenerationUseCases = { async complete() { throw new Error('unexpected complete') }, async *stream() { streams++; yield '# 报告首段'; visible.resolve(); await gate.promise; yield '\n完整正文' } }
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai, candidateProfile: { ...profile, async afterReview() { profileCalls++; if (profileCalls === 1) throw new Error('temporary projection failure'); return {} } } }))
+    try {
+      const started = await service.start(context, { mode: 'resume', target_role: '后端' })
+      await service.end(context, started.session_id, [])
+      const task = { task_id: started.session_id, user_id: 'user-a', type: 'resume_review', status: 'running' as const, payload: {}, attempts: 1, created_at: '', updated_at: '' }
+      const running = service.runReviewTask(task)
+      await visible.promise
+      expect((await service.review(context, started.session_id)).review).toBe('# 报告首段')
+      expect((await service.review(context, started.session_id)).status).toBe('reviewing')
+      gate.resolve(); await running
+      expect((await service.review(context, started.session_id)).meta.profile_extract_failed).toBeTrue()
+      const reopened = new InterviewService(interviewDependencies({ sessions, states, ai, candidateProfile: { ...profile, async afterReview() { profileCalls++; return {} } } }))
+      await reopened.runReviewTask(task)
+      expect(streams).toBe(1); expect(profileCalls).toBe(2)
+      expect((await reopened.review(context, started.session_id)).meta.review_stage).toBe('complete')
+    } finally { gate.resolve(); sessions.close(); states.close() }
+  })
+
+  test('preserves original answers, persists evidence-bound comparisons and replays the same request', async () => {
+    const path = await databasePath(); const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path); states.initialize()
+    const ai = new FakeAi([JSON.stringify({ comparison: '补充了事务边界，验证证据还不足。', technical_gaps: [{ point: '缺少并发验证', evidence: '尚未压测', exercise: '写一个并发重复请求用例' }], expression_gaps: [] })])
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai }))
+    try {
+      await sessions.create({ sessionId: 'practice', userId: 'user-a', mode: 'resume' })
+      await sessions.appendMessage('practice', 'user-a', 'assistant', '怎么保证幂等？')
+      await sessions.appendMessage('practice', 'user-a', 'user', '使用唯一约束。')
+      await sessions.saveReview({ sessionId: 'practice', userId: 'user-a', review: '原始报告' })
+      await sessions.saveReferenceAnswer('practice', 'user-a', 'resume-turn-1', '参考：唯一键配合事务与并发验证。')
+      const requestId = crypto.randomUUID()
+      const pendingComparison = service.compareAnswer(context, 'practice', 'resume-turn-1', '唯一约束和事务，尚未压测', requestId)
+      await expect(service.compareAnswer(context, 'practice', 'resume-turn-1', '另一份回答', crypto.randomUUID())).rejects.toMatchObject({ status: 409 })
+      const first = await pendingComparison
+      const replay = await new InterviewService(interviewDependencies({ sessions, states, ai })).compareAnswer(context, 'practice', 'resume-turn-1', '唯一约束和事务，尚未压测', requestId)
+      expect(replay).toEqual(first); expect(ai.calls).toHaveLength(1)
+      expect(ai.calls[0]?.find((message) => message.role === 'user')?.content.toLowerCase()).toContain('json')
+      expect((await sessions.get('practice', 'user-a'))?.transcript[1]?.content).toBe('使用唯一约束。')
+      expect((await service.trainingProgress(context)).items[0]?.technical_gaps[0]?.evidence).toBe('尚未压测')
+      expect((await service.trainingProgress({ ...context, userId: 'user-b' })).items).toEqual([])
+      await expect(service.compareAnswer({ ...context, userId: 'user-b' }, 'practice', 'resume-turn-1', 'x', crypto.randomUUID())).rejects.toMatchObject({ status: 404 })
+      await expect(service.compareAnswer(context, 'practice', 'resume-turn-1', '更改内容', requestId)).rejects.toMatchObject({ status: 409 })
+    } finally { sessions.close(); states.close() }
+  })
+  test('rejects invented comparison evidence without saving a training attempt', async () => {
+    const path = await databasePath(); const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path); states.initialize()
+    const ai = new FakeAi([JSON.stringify({ comparison: '无依据的判断', technical_gaps: [{ point: '缺口', evidence: '不存在的候选人原话', exercise: '练习' }], expression_gaps: [] })])
+    const service = new InterviewService(interviewDependencies({ sessions, states, ai }))
+    try {
+      await sessions.create({ sessionId: 'unsupported-evidence', userId: 'user-a', mode: 'resume' })
+      await sessions.appendMessage('unsupported-evidence', 'user-a', 'assistant', '如何验证？')
+      await sessions.appendMessage('unsupported-evidence', 'user-a', 'user', '使用测试。')
+      await sessions.saveReview({ sessionId: 'unsupported-evidence', userId: 'user-a', review: '原始报告' })
+      await sessions.saveReferenceAnswer('unsupported-evidence', 'user-a', 'resume-turn-1', '补充边界测试。')
+      await expect(service.compareAnswer(context, 'unsupported-evidence', 'resume-turn-1', '我补充边界测试。', crypto.randomUUID())).rejects.toThrow('evidence must quote')
+      expect((await service.trainingProgress(context)).items).toEqual([])
+    } finally { sessions.close(); states.close() }
+  })
 })

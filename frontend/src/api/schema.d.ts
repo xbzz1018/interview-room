@@ -1807,6 +1807,17 @@ export interface paths {
                         divergence?: number;
                         target_role?: string;
                         job_description?: string;
+                        /**
+                         * @default strict
+                         * @enum {string}
+                         */
+                        training_mode?: "strict" | "coach";
+                        /** @default [] */
+                        material_document_ids?: string[];
+                        resume_document_id?: string;
+                        jd_document_id?: string;
+                        /** @default true */
+                        use_resume?: boolean;
                     };
                 };
             };
@@ -2197,6 +2208,139 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview/compare-answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        session_id: string;
+                        question_id: string | number;
+                        answer: string;
+                        /** Format: uuid */
+                        request_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Compare retry answer */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            comparison: string;
+                            attempt_id: string;
+                            question_id: string;
+                            question: string;
+                            answer: string;
+                            original_answer: string;
+                            technical_gaps: {
+                                point: string;
+                                evidence: string;
+                                exercise: string;
+                            }[];
+                            expression_gaps: {
+                                point: string;
+                                evidence: string;
+                                exercise: string;
+                            }[];
+                            created_at: string;
+                            /** @enum {boolean} */
+                            assisted: true;
+                        };
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview/training-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Recent practice progress */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                comparison: string;
+                                attempt_id: string;
+                                question_id: string;
+                                question: string;
+                                answer: string;
+                                original_answer: string;
+                                technical_gaps: {
+                                    point: string;
+                                    evidence: string;
+                                    exercise: string;
+                                }[];
+                                expression_gaps: {
+                                    point: string;
+                                    evidence: string;
+                                    exercise: string;
+                                }[];
+                                created_at: string;
+                                /** @enum {boolean} */
+                                assisted: true;
+                                session_id: string;
+                                training_mode: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;

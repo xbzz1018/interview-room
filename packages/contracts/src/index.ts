@@ -173,6 +173,11 @@ export const StartInterviewSchema = z.object({
   divergence: z.number().int().min(1).max(5).optional(),
   target_role: z.string().optional(),
   job_description: z.string().max(12000).optional(),
+  training_mode: z.enum(['strict', 'coach']).default('strict'),
+  material_document_ids: z.array(z.string()).max(8).default([]),
+  resume_document_id: z.string().optional(),
+  jd_document_id: z.string().optional(),
+  use_resume: z.boolean().default(true),
 })
 export const JobPrepPreviewSchema = z.object({ request_id: z.uuid().optional(), jd_text: z.string(), company: z.string().nullable().optional(), position: z.string().nullable().optional(), use_resume: z.boolean().default(true) })
 const JobPrepStartFieldsSchema = JobPrepPreviewSchema.extend({ session_id: z.string().min(1).max(200).optional(), preview_data: z.record(z.string(), z.unknown()).optional() })
@@ -184,6 +189,10 @@ export const InterviewChatSchema = z.object({ session_id: z.string(), message: z
 export const EndInterviewSchema = z.object({ answers: z.array(InterviewAnswerSchema).default([]) })
 export const ReferenceAnswerRequestSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]) })
 export const ReferenceAnswerResponseSchema = z.object({ reference_answer: z.string(), cached: z.boolean() })
+export const CompareAnswerSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]), answer: z.string().min(1).max(12000), request_id: z.uuid() })
+const TrainingGapSchema = z.object({ point: z.string(), evidence: z.string(), exercise: z.string() })
+export const CompareAnswerResponseSchema = z.strictObject({ comparison: z.string(), attempt_id: z.string(), question_id: z.string(), question: z.string(), answer: z.string(), original_answer: z.string(), technical_gaps: z.array(TrainingGapSchema), expression_gaps: z.array(TrainingGapSchema), created_at: z.string(), assisted: z.literal(true) })
+export const TrainingProgressResponseSchema = z.object({ items: z.array(CompareAnswerResponseSchema.extend({ session_id: z.string(), training_mode: z.string() })) })
 /** @deprecated Phase-two HTTP routes use named response schemas; remove in phase five. */
 export const InterviewObjectSchema = z.record(z.string(), z.unknown())
 export const InterviewTopicsSchema = z.array(z.string())

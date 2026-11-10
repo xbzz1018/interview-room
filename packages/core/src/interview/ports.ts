@@ -1,4 +1,5 @@
 import type { InterviewStreamEvent } from './results.ts'
+import type { TrainingAttempt } from './training.ts'
 import type { IdGenerator } from '../account/ports.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type { KnowledgeQuery, KnowledgeStore } from '../knowledge/ports.ts'
@@ -35,6 +36,7 @@ export interface InterviewSessionRepository {
   saveReview(input: { sessionId: string; userId: string; review: string; scores?: Array<Record<string, unknown>>; weakPoints?: unknown[]; overall?: Record<string, unknown> }): Promise<boolean>
   updateMeta(sessionId: string, userId: string, patch: Record<string, unknown>): Promise<boolean>
   saveReferenceAnswer(sessionId: string, userId: string, questionId: string, answer: string): Promise<boolean>
+  saveTrainingAttempt(sessionId: string, userId: string, attempt: TrainingAttempt): Promise<boolean>
   list(input: { userId: string; limit: number; offset: number; mode?: InterviewMode; topic?: string }): Promise<{ items: SessionSummary[]; total: number }>
   delete(sessionId: string, userId: string): Promise<boolean>
   topics(userId: string): Promise<string[]>
@@ -72,7 +74,8 @@ export interface CandidateProfilePort {
   summary(userId: string, topic?: string, memoryQuery?: string): Promise<string>
   targetRole(userId: string): Promise<string>
   updateTargetRole(userId: string, role: string): Promise<void>
-  afterReview?(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown> | undefined>
+  reviewExtractionPrompt?(userId: string): Promise<string>
+  afterReview?(input: { userId: string; session: InterviewSession; context?: RequestContext; extraction?: unknown }): Promise<Record<string, unknown> | undefined>
   addPredictedWeakPoints?(input: { userId: string; topic: string; points: string[] }): Promise<void>
 }
 
@@ -86,6 +89,8 @@ export interface InterviewUseCases {
   draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewDraftResult>
   generateReview(context: RequestContext, sessionId: string): Promise<InterviewReviewSubmissionResult>
   referenceAnswer(context: RequestContext, sessionId: string, questionId: string | number): Promise<{ reference_answer: string; cached: boolean }>
+  compareAnswer(context: RequestContext, sessionId: string, questionId: string | number, answer: string, requestId: string): Promise<TrainingAttempt>
+  trainingProgress(context: RequestContext): Promise<{ items: Array<TrainingAttempt & { session_id: string; training_mode: string }> }>
   resume(context: RequestContext, sessionId: string): Promise<InterviewResumeResult>
   review(context: RequestContext, sessionId: string): Promise<InterviewSession>
   history(context: RequestContext, input: { limit?: number; offset?: number; mode?: InterviewMode; topic?: string }): Promise<{ items: SessionSummary[]; total: number }>
@@ -106,5 +111,6 @@ export type InterviewDependencies = {
   knowledgeStore: KnowledgeStore
   settings: ProviderSettingsRepository
   profile: CandidateProfilePort
+  materials?: { documentText(context: RequestContext, documentIds: string[]): Promise<Array<{ document_id: string; filename: string; content: string; updated_at: string }>> }
   maxQuestionsPerPhase?: number
 }

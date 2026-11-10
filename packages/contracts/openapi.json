@@ -4989,6 +4989,32 @@
                   "job_description": {
                     "type": "string",
                     "maxLength": 12000
+                  },
+                  "training_mode": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "coach"
+                    ],
+                    "default": "strict"
+                  },
+                  "material_document_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8,
+                    "default": []
+                  },
+                  "resume_document_id": {
+                    "type": "string"
+                  },
+                  "jd_document_id": {
+                    "type": "string"
+                  },
+                  "use_resume": {
+                    "type": "boolean",
+                    "default": true
                   }
                 },
                 "required": [
@@ -5446,6 +5472,289 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/interview/compare-answer": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "question_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "answer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12000
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "session_id",
+                  "question_id",
+                  "answer",
+                  "request_id"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Compare retry answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "comparison": {
+                      "type": "string"
+                    },
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "question_id": {
+                      "type": "string"
+                    },
+                    "question": {
+                      "type": "string"
+                    },
+                    "answer": {
+                      "type": "string"
+                    },
+                    "original_answer": {
+                      "type": "string"
+                    },
+                    "technical_gaps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "point": {
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "type": "string"
+                          },
+                          "exercise": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "point",
+                          "evidence",
+                          "exercise"
+                        ]
+                      }
+                    },
+                    "expression_gaps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "point": {
+                            "type": "string"
+                          },
+                          "evidence": {
+                            "type": "string"
+                          },
+                          "exercise": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "point",
+                          "evidence",
+                          "exercise"
+                        ]
+                      }
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "assisted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "comparison",
+                    "attempt_id",
+                    "question_id",
+                    "question",
+                    "answer",
+                    "original_answer",
+                    "technical_gaps",
+                    "expression_gaps",
+                    "created_at",
+                    "assisted"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/interview/training-progress": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Recent practice progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "comparison": {
+                            "type": "string"
+                          },
+                          "attempt_id": {
+                            "type": "string"
+                          },
+                          "question_id": {
+                            "type": "string"
+                          },
+                          "question": {
+                            "type": "string"
+                          },
+                          "answer": {
+                            "type": "string"
+                          },
+                          "original_answer": {
+                            "type": "string"
+                          },
+                          "technical_gaps": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "point": {
+                                  "type": "string"
+                                },
+                                "evidence": {
+                                  "type": "string"
+                                },
+                                "exercise": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "point",
+                                "evidence",
+                                "exercise"
+                              ]
+                            }
+                          },
+                          "expression_gaps": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "point": {
+                                  "type": "string"
+                                },
+                                "evidence": {
+                                  "type": "string"
+                                },
+                                "exercise": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "point",
+                                "evidence",
+                                "exercise"
+                              ]
+                            }
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "assisted": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          },
+                          "session_id": {
+                            "type": "string"
+                          },
+                          "training_mode": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "comparison",
+                          "attempt_id",
+                          "question_id",
+                          "question",
+                          "answer",
+                          "original_answer",
+                          "technical_gaps",
+                          "expression_gaps",
+                          "created_at",
+                          "assisted",
+                          "session_id",
+                          "training_mode"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
                 }
               }
             }

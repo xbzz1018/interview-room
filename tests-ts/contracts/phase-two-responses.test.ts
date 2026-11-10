@@ -22,6 +22,8 @@ const requiredFields: Record<string, string[]> = {
   generateReview: ['session_id', 'mode', 'status'],
   resume: ['session_id', 'mode', 'status', 'transcript', 'questions', 'target_role', 'job_description', 'meta', 'can_continue', 'is_finished', 'has_review'],
   referenceAnswer: ['reference_answer', 'cached'],
+  compareAnswer: ['comparison', 'attempt_id', 'question_id', 'question', 'answer', 'original_answer', 'technical_gaps', 'expression_gaps', 'created_at', 'assisted'],
+  trainingProgress: ['items'],
   review: ['session_id', 'mode', 'meta', 'questions', 'transcript', 'scores', 'weak_points', 'overall', 'reference_answers', 'status', 'user_id', 'created_at', 'updated_at'],
   task: ['status', 'type'],
   history: ['items', 'total'],
@@ -34,9 +36,9 @@ const requiredFields: Record<string, string[]> = {
 }
 
 describe('phase two response contracts at every HTTP boundary', () => {
-  test('covers all 21 scoped JSON operations, excluding the phase-three stream', () => {
+  test('covers all 23 scoped JSON operations, excluding the phase-three stream', () => {
     const scoped = responseInventory.filter((entry) => entry.transport === 'json' && ['apps/api/src/routes/interview.ts', 'apps/api/src/routes/profile.ts'].includes(entry.routeFile))
-    expect<unknown>(phaseTwoCases).toHaveLength(21)
+    expect<unknown>(phaseTwoCases).toHaveLength(23)
     expect<unknown>(phaseTwoCases.map((entry) => entry.operation).sort()).toEqual(scoped.map((entry) => entry.operation).sort())
     expect<unknown>(scoped.every((entry) => !entry.dynamic && Boolean(entry.responseSchema))).toBe(true)
   })

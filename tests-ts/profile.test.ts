@@ -302,3 +302,20 @@ test('Copilot reviews validate predicted weaknesses, update SM-2 and count once 
     expect(stored.topic_mastery).toEqual({})
   } finally { sessions.close(); vectors.close() }
 })
+
+
+test('coaching sessions retain observations without entering independent score trends', async () => {
+  const f = await fixture([JSON.stringify({ session_summary: '教练练习摘要', weak_points: [{ point: '事务边界需要练习', topic: 'database' }], strong_points: [], behavior_signals: [], topic_mastery: { database: { score: 90 } }, avg_score: 9, dimension_scores: { communication: 9 } })])
+  try {
+    const session = reviewedSession({ mode: 'resume', meta: { training_mode: 'coach' }, topic: null, scores: [], overall: {} })
+    const result = await f.service.afterReview({ userId: 'user-a', session, context })
+    expect(result.avg_score).toBeUndefined()
+    expect(result.dimension_scores).toBeUndefined()
+    const profile = await f.repository.load('user-a')
+    expect(profile.stats.total_sessions).toBe(1)
+    expect(profile.stats.coach_sessions).toBe(1)
+    expect(profile.stats.score_history).toEqual([])
+    expect(profile.topic_mastery).toEqual({})
+    expect(profile.weak_points[0]?.point).toBe('事务边界需要练习')
+  } finally { f.sessions.close(); f.vectors.close() }
+})

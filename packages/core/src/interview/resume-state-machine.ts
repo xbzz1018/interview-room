@@ -61,7 +61,7 @@ export class ResumeInterviewEngine {
   ) {}
 
   private async system(state: ResumeInterviewState, userId: string): Promise<string> {
-    return fill(RESUME_INTERVIEWER_SYSTEM, {
+    const base = fill(RESUME_INTERVIEWER_SYSTEM, {
       target_role: state.target_role || '候选人应聘岗位',
       job_description: state.job_description || '未提供岗位 JD，请结合目标岗位和简历面试。',
       resume_context: state.resume_context,
@@ -69,18 +69,18 @@ export class ResumeInterviewEngine {
       asked_questions: state.questions_asked.length ? state.questions_asked.map((value) => `- ${value}`).join('\n') : '无',
       user_profile: await this.profile.summary(userId),
     })
+    return `${base}\n\n## 训练模式\n${state.training_mode === 'coach' ? '教练练习：候选人明确请求提示、拆解或示范时可以先帮助，再要求候选人自己重答；标记受帮助的回答，不把它当作严格模拟成绩。' : '严格模拟：面试中不展示参考答案、评分细节或提示；只继续提问，复盘阶段再给反馈。'}`
   }
 
-  async start(context: RequestContext, input: { sessionId: string; targetRole: string; jobDescription: string; resumeContext: string }): Promise<{ opening: string; state: ResumeInterviewState }> {
+  async start(context: RequestContext, input: { sessionId: string; targetRole: string; jobDescription: string; resumeContext: string; trainingMode?: 'strict' | 'coach' }): Promise<{ opening: string; state: ResumeInterviewState }> {
     const state: ResumeInterviewState = {
       messages: [], phase: 'greeting', target_role: input.targetRole.trim() || '候选人应聘岗位',
       job_description: input.jobDescription.trim(), resume_context: input.resumeContext,
-      questions_asked: [], phase_question_count: 0, is_finished: false, last_eval: {}, eval_history: [],
+      questions_asked: [], phase_question_count: 0, is_finished: false, last_eval: {}, eval_history: [], training_mode: input.trainingMode || 'strict',
     }
-    const opening = await this.ai.complete(context, [
-      { role: 'system', content: await this.system(state, context.userId!) },
-      { role: 'user', content: '面试开始，请开场并让候选人做自我介绍。' },
-    ])
+    // The greeting does not need generation. Keep the full context in state for
+    // the first personalized follow-up, without spending a model call to start.
+    const opening = `你好，欢迎参加${state.target_role}面试。请先做一个简短的自我介绍，重点说说你的相关经历，以及你最想展开介绍的项目。`
     state.messages.push({ role: 'assistant', content: opening })
     return { opening, state }
   }

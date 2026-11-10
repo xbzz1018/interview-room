@@ -58,6 +58,7 @@ export type ResumeInterviewState = {
   is_finished: boolean
   last_eval: InlineEvaluation
   eval_history: InlineEvaluation[]
+  training_mode?: 'strict' | 'coach'
 }
 
 export type InterviewSession = {
@@ -116,6 +117,11 @@ export type StartInterviewInput = {
   divergence?: number
   target_role?: string
   job_description?: string
+  training_mode?: 'strict' | 'coach'
+  material_document_ids?: string[]
+  resume_document_id?: string
+  jd_document_id?: string
+  use_resume?: boolean
 }
 
 export type JobPrepInput = {

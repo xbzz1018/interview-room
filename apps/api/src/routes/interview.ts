@@ -14,6 +14,9 @@ import {
   OkSchema,
   ReferenceAnswerRequestSchema,
   ReferenceAnswerResponseSchema,
+  CompareAnswerSchema,
+  CompareAnswerResponseSchema,
+  TrainingProgressResponseSchema,
   StartInterviewSchema,
 } from '@techspar/contracts'
 import type { InterviewUseCases, TokenService } from '@techspar/core'
@@ -67,6 +70,12 @@ export function registerInterviewRoutes(app: OpenAPIHono, deps: { interview: Int
 
   app.openapi(createRoute({ method: 'post', path: '/api/interview/reference-answer', request: { body: { content: { 'application/json': { schema: ReferenceAnswerRequestSchema } } } }, responses: { 200: { content: { 'application/json': { schema: ReferenceAnswerResultSchema } }, description: 'Reference answer' } } }),
     async (c) => { const body = c.req.valid('json'); return c.json(validateResponse(ReferenceAnswerResultSchema, await deps.interview.referenceAnswer(await authenticatedContext(c, deps.tokens), body.session_id, body.question_id), 'POST /api/interview/reference-answer', c.get('requestId'))) })
+
+  app.openapi(createRoute({ method: 'post', path: '/api/interview/compare-answer', request: { body: { content: { 'application/json': { schema: CompareAnswerSchema } } } }, responses: { 200: { content: { 'application/json': { schema: CompareAnswerResponseSchema } }, description: 'Compare retry answer' } } }),
+    async (c) => { const body = c.req.valid('json'); return c.json(validateResponse(CompareAnswerResponseSchema, await deps.interview.compareAnswer(await authenticatedContext(c, deps.tokens), body.session_id, body.question_id, body.answer, body.request_id), 'POST /api/interview/compare-answer', c.get('requestId'))) })
+
+  app.openapi(createRoute({ method: 'get', path: '/api/interview/training-progress', responses: { 200: { content: { 'application/json': { schema: TrainingProgressResponseSchema } }, description: 'Recent practice progress' } } }),
+    async (c) => c.json(validateResponse(TrainingProgressResponseSchema, await deps.interview.trainingProgress(await authenticatedContext(c, deps.tokens)), 'GET /api/interview/training-progress', c.get('requestId'))))
 
   app.openapi(createRoute({ method: 'get', path: '/api/interview/review/{session_id}', request: { params: SessionPath }, responses: { 200: { content: { 'application/json': { schema: InterviewSessionResponseSchema.meta({ id: 'InterviewSessionResponse' }) } }, description: 'Review' } } }),
     async (c) => c.json(validateResponse(InterviewSessionResponseSchema, await deps.interview.review(await authenticatedContext(c, deps.tokens), c.req.valid('param').session_id), 'GET /api/interview/review/{session_id}', c.get('requestId'))))
