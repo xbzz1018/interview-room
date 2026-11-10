@@ -1,12 +1,14 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { ChevronRight, PanelLeft } from 'lucide-react';
+import { AppearanceMenu } from './components/AppearanceMenu';
 import { AuthProvider } from "./contexts/AuthContext";
 import { TaskStatusProvider } from "./contexts/TaskStatusContext";
 import useAuth from "./hooks/useAuth";
 import Sidebar from "./components/Sidebar";
 import TaskNotification from "./components/TaskNotification";
 import ErrorBoundary from "./components/ErrorBoundary";
-import Landing from "./pages/Landing";
+import PersonalWelcome from "./pages/PersonalWelcome";
 import Login from "./pages/Login";
 import Interview from "./pages/Interview";
 import Review from "./pages/Review";
@@ -47,8 +49,8 @@ function ProviderGate({ children }: { children: ReactNode }) {
 function PublicHome() {
   const { token, loading } = useAuth();
   if (loading) return null;
-  if (token) return <Navigate to="/profile" replace />;
-  return <Landing />;
+  if (token) return <Navigate to="/mock-interview?mode=live" replace />;
+  return <PersonalWelcome />;
 }
 
 function AuthPage() {
@@ -59,12 +61,18 @@ function AuthPage() {
 }
 
 function AppShell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const pageTitle = pathname.startsWith('/review/') ? '逐题复盘' : pathname.startsWith('/interview/') ? '模拟面试' : ({ '/mock-interview': '开始面试', '/history': '复盘与重练', '/personal-agent': '资料与学习', '/resume-manager': '我的简历', '/topic-drill': '专项练习', '/profile': '能力记录', '/settings': '模型与设置' } as Record<string, string>)[pathname] || '我的训练';
   return (
-    <div className="flex flex-col md:flex-row h-screen">
+    <div className="personal-shell flex flex-col md:flex-row h-screen bg-background">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto flex flex-col">
-        {children}
-      </main>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="personal-topbar hidden shrink-0 items-center justify-between gap-4 border-b border-border px-7 md:flex">
+          <div className="flex items-center gap-3 text-xs text-dim"><PanelLeft size={16} aria-hidden="true" /><span>我的练习空间</span><ChevronRight size={13} aria-hidden="true" /><span>{pageTitle}</span></div>
+          <AppearanceMenu />
+        </header>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   User, BookOpen, GitFork, Clock, Mic, Brain,
-  Target, FileText, FileUser, Settings as SettingsIcon,
-  Sun, Moon, LogOut, Menu, X, ChevronLeft, ChevronRight, Sparkles,
+  Target, FileUser, Settings as SettingsIcon,
+  LogOut, Menu, X, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, MessagesSquare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import useAuth from "../hooks/useAuth";
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import Logo from "./Logo";
-import AfdianIcon from "./AfdianIcon";
+import { AppearanceMenu } from './AppearanceMenu';
 import {
   Tooltip,
   TooltipContent,
@@ -27,67 +28,73 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { path: "/profile", label: "我的画像", icon: User },
-  { path: "/personal-agent", label: "成长 Agent", icon: Sparkles },
-  { path: "/topic-drill", label: "专项训练", icon: Target },
-  { path: "/mock-interview", label: "面试训练", icon: FileText },
-  { path: "/resume-manager", label: "简历管理", icon: FileUser },
+  { path: "/mock-interview", label: "开始面试", icon: MessagesSquare },
+  { path: "/history", label: "复盘与重练", icon: Clock },
+  { path: "/personal-agent", label: "资料与学习", icon: FolderOpen },
+  { path: "/resume-manager", label: "我的简历", icon: FileUser },
+  { path: "/topic-drill", label: "专项练习", icon: Target },
+  { path: "/profile", label: "能力记录", icon: User },
+];
+
+const MORE_ITEMS: NavItem[] = [
+  { path: "/knowledge", label: "知识库", icon: BookOpen },
   { path: "/recording", label: "录音复盘", icon: Mic },
   { path: "/copilot", label: "面试 Copilot", icon: Brain },
-  { path: "/knowledge", label: "领域管理", icon: BookOpen },
-  { path: "/graph", label: "图谱", icon: GitFork },
-  { path: "/history", label: "历史记录", icon: Clock },
-  { path: "/settings", label: "设置", icon: SettingsIcon },
+  { path: "/graph", label: "知识图谱", icon: GitFork },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
+  const [toolsOverride, setToolsOverride] = useState<{ path: string; open: boolean } | null>(null);
   const open = openPath === location.pathname;
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+  const toolRoute = MORE_ITEMS.some(({ path }) => location.pathname.startsWith(path));
+  const toolsExpanded = toolsOverride?.path === location.pathname ? toolsOverride.open : toolRoute;
 
   useEffect(() => { localStorage.setItem("sidebar-collapsed", String(collapsed)); }, [collapsed]);
 
-  const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
-  const isActive = (path: string) =>
-    path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+  useEffect(() => {
+    const closeDesktopOverlay = () => { if (window.innerWidth >= 768) setOpenPath(null); };
+    window.addEventListener("resize", closeDesktopOverlay);
+    return () => window.removeEventListener("resize", closeDesktopOverlay);
+  }, []);
+
+  const isActive = (path: string) => {
+    if (path === "/mock-interview" && location.pathname.startsWith("/interview/")) return true;
+    if (path === "/history" && location.pathname.startsWith("/review/")) return true;
+    return location.pathname.startsWith(path);
+  };
 
   const handleLogout = () => {
     logout();
     navigate("/login", { replace: true });
   };
 
-  const navItem = ({ path, label, icon: Icon }: NavItem) => {
+  const navItem = ({ path, label, icon: Icon }: NavItem, compact: boolean) => {
     const active = isActive(path);
     const btn = (
-      <button
-        onClick={() => { setOpenPath(null); navigate(path); }}
+      <Link
+        to={path}
+        aria-label={label}
+        aria-current={active ? "page" : undefined}
+        onClick={() => setOpenPath(null)}
         className={cn(
-          "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] transition-all duration-300 text-left group relative overflow-hidden",
+          "flex items-center gap-3 w-full px-3 py-3 rounded-lg text-[13px] transition-colors text-left group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           active
             ? "bg-primary/12 text-primary font-medium"
             : "text-dim hover:text-text hover:bg-hover",
-          collapsed && "justify-center px-0"
+          compact && "justify-center px-0"
         )}
       >
-        {!active && <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />}
-        {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary drop-shadow-[0_0_4px_currentColor]" />
-        )}
-        <Icon size={18} className={cn("shrink-0 relative z-10 transition-transform duration-300", active ? "text-primary" : "text-dim group-hover:text-primary group-hover:scale-[1.15]")} />
-        {!collapsed && <span className="truncate relative z-10 transition-transform duration-300 group-hover:translate-x-1">{label}</span>}
-      </button>
+        <Icon size={18} className={cn("shrink-0", active ? "text-primary" : "text-dim group-hover:text-primary")} />
+        {!compact && <span className="truncate">{label}</span>}
+      </Link>
     );
 
-    if (collapsed) {
+    if (compact) {
       return (
         <Tooltip key={path} delayDuration={0}>
           <TooltipTrigger asChild>{btn}</TooltipTrigger>
@@ -98,115 +105,110 @@ export default function Sidebar() {
     return <div key={path}>{btn}</div>;
   };
 
-  const nav = (
+  const sidebar = (mobile = false) => {
+    const compact = collapsed && !mobile;
+    const toolsId = mobile ? "mobile-more-tools" : "desktop-more-tools";
+    return (
     <aside className={cn(
       "flex flex-col h-full border-r border-sidebar-border bg-sidebar transition-all duration-300",
-      collapsed ? "w-[68px]" : "w-[240px]"
+      compact ? "w-[68px]" : "w-[224px]"
     )}>
-      <div className={cn("flex items-center shrink-0 py-5", collapsed ? "justify-center px-4" : "px-6 gap-2.5")}>
-        <Logo className="w-7 h-7 rounded-lg shrink-0 drop-shadow-sm" />
-        {!collapsed && (
-          <span className="text-lg font-display font-bold text-sidebar-foreground translate-y-[1px]">TechSpar</span>
-        )}
+      <div className={cn("flex items-center shrink-0 py-5", compact ? "justify-center px-4" : "px-5 gap-2.5")}>
+        <Logo className="h-9 w-9 rounded-lg" />
+        {!compact && <span className="text-base font-display font-semibold text-sidebar-foreground">面试练习室<span className="mt-1 block text-[10px] font-normal text-dim">我的个人训练空间</span></span>}
+        {mobile && <Dialog.Close asChild><Button variant="ghost" size="icon" className="ml-auto h-7 w-7" aria-label="关闭导航"><X size={17} /></Button></Dialog.Close>}
       </div>
 
-      <Separator />
+      {!compact && <p className="px-6 pb-1 pt-5 text-[11px] tracking-wider text-dim">我的训练</p>}
 
       <TooltipProvider delayDuration={0}>
-        <nav className={cn("flex-1 flex flex-col gap-0.5 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
-          {NAV_ITEMS.map(navItem)}
+        <nav aria-label={mobile ? "移动导航" : "主要导航"} className={cn("flex-1 flex flex-col gap-1 overflow-y-auto py-3", compact ? "px-2" : "px-3")}>
+          {NAV_ITEMS.map((item) => navItem(item, compact))}
+          <div className="mt-3 border-t border-sidebar-border pt-2">
+            <button
+              type="button"
+              aria-label="更多工具"
+              aria-expanded={toolsExpanded}
+              aria-controls={toolsId}
+              onClick={() => setToolsOverride({ path: location.pathname, open: !toolsExpanded })}
+              className={cn("flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-dim hover:bg-hover hover:text-text", compact && "justify-center px-0")}
+            >
+              <ChevronDown size={18} className={cn("shrink-0 transition-transform", !toolsExpanded && "-rotate-90")} />
+              {!compact && <span>更多工具</span>}
+            </button>
+            <div id={toolsId} hidden={!toolsExpanded} className="space-y-0.5">
+              {MORE_ITEMS.map((item) => navItem(item, compact))}
+            </div>
+          </div>
+          <div className="mt-auto pt-3">{navItem({ path: "/settings", label: "模型与设置", icon: SettingsIcon }, compact)}</div>
         </nav>
 
         <Separator />
 
-        <div className={cn("py-2 space-y-0.5", collapsed ? "px-2" : "px-3")}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <a href="https://ifdian.net/a/techspar" target="_blank" rel="noopener noreferrer"
-                aria-label="赞助 TechSpar"
-                className={cn("flex items-center gap-2.5 w-full py-2 rounded-lg text-[13px] text-dim hover:text-primary hover:bg-hover transition-all", collapsed && "justify-center")}>
-                <AfdianIcon size={18} />
-                {!collapsed && <span>赞助 TechSpar</span>}
-              </a>
-            </TooltipTrigger>
-            {collapsed && <TooltipContent side="right" sideOffset={8}>赞助 TechSpar</TooltipContent>}
-          </Tooltip>
-
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={toggleTheme}
-                className={cn(
-                  "flex items-center gap-2.5 w-full py-2 rounded-lg text-[13px] text-dim hover:text-text hover:bg-hover transition-all",
-                  collapsed && "justify-center"
-                )}
-              >
-                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-                {!collapsed && (theme === "dark" ? "浅色模式" : "深色模式")}
-              </button>
-            </TooltipTrigger>
-            {collapsed && <TooltipContent side="right" sideOffset={8}>{theme === "dark" ? "浅色模式" : "深色模式"}</TooltipContent>}
-          </Tooltip>
+        <div className={cn("py-2 space-y-0.5", compact ? "px-2" : "px-3")}>
+          <AppearanceMenu collapsed={compact} />
 
           {user && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={handleLogout}
+                  aria-label="退出登录"
                   className={cn(
                     "flex items-center gap-2.5 w-full py-2 rounded-lg text-[13px] text-dim hover:text-red hover:bg-red/8 transition-all",
-                    collapsed && "justify-center"
+                    compact && "justify-center"
                   )}
                 >
                   <LogOut size={18} />
-                  {!collapsed && <span className="truncate">{user.name || user.email}</span>}
+                  {!compact && <span className="truncate">{user.name || user.email}</span>}
                 </button>
               </TooltipTrigger>
-              {collapsed && <TooltipContent side="right" sideOffset={8}>退出登录</TooltipContent>}
+              {compact && <TooltipContent side="right" sideOffset={8}>退出登录</TooltipContent>}
             </Tooltip>
           )}
 
-          <Tooltip>
+          {!mobile && <Tooltip>
             <TooltipTrigger asChild>
               <button
                 onClick={() => setCollapsed(c => !c)}
+                aria-label={compact ? "展开侧栏" : "收起侧栏"}
                 className={cn(
                   "flex items-center gap-2.5 w-full py-2 rounded-lg text-[13px] text-dim hover:text-text hover:bg-hover transition-all mt-1",
-                  collapsed && "justify-center"
+                  compact && "justify-center"
                 )}
               >
-                {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-                {!collapsed && "收起侧栏"}
+                {compact ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                {!compact && "收起侧栏"}
               </button>
             </TooltipTrigger>
-            {collapsed && <TooltipContent side="right" sideOffset={8}>展开侧栏</TooltipContent>}
-          </Tooltip>
+            {compact && <TooltipContent side="right" sideOffset={8}>展开侧栏</TooltipContent>}
+          </Tooltip>}
         </div>
       </TooltipProvider>
     </aside>
   );
+  };
 
   return (
-    <>
+    <Dialog.Root open={open} onOpenChange={(value) => setOpenPath(value ? location.pathname : null)}>
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => { setOpenPath(null); navigate("/"); }}>
-          <Logo className="w-7 h-7 rounded-lg drop-shadow-sm" />
-          <span className="text-base font-display font-bold text-text translate-y-[1px]">TechSpar</span>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => setOpenPath(open ? null : location.pathname)}>
-          {open ? <X size={18} /> : <Menu size={18} />}
-        </Button>
+        <Link to="/mock-interview?mode=live" className="flex items-center gap-2.5" onClick={() => setOpenPath(null)}>
+          <Logo className="h-7 w-7 rounded-lg" />
+          <span className="text-base font-display font-bold text-text">面试练习室</span>
+        </Link>
+        <div className="flex items-center gap-1"><AppearanceMenu collapsed /><Dialog.Trigger asChild><Button variant="ghost" size="icon" aria-label="打开导航"><Menu size={18} /></Button></Dialog.Trigger></div>
       </div>
 
-      <div className="hidden md:flex shrink-0">{nav}</div>
+      <div className="hidden md:flex shrink-0">{sidebar()}</div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          <div className="animate-fade-in">{nav}</div>
-          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setOpenPath(null)} />
-        </div>
-      )}
-    </>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm md:hidden" />
+        <Dialog.Content className="fixed inset-y-0 left-0 z-50 outline-none md:hidden">
+          <Dialog.Title className="sr-only">面试练习室导航</Dialog.Title>
+          <Dialog.Description className="sr-only">开始面试、准备资料或打开复盘记录。</Dialog.Description>
+          {sidebar(true)}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
