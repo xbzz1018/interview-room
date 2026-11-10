@@ -1,180 +1,93 @@
-<div align="center">
+# 面试练习室 · Interview Room
 
-<img src="images/techspar-horizontal-logo.svg" alt="TechSpar" width="520" />
+<img src="images/interview-room-mark.svg" alt="面试练习室标识" width="72" />
 
-**把专项训练、简历面试、JD 备面、实时 Copilot 与录音复盘，串成一个持续进化的技术面试闭环。**
+把自己的简历、项目材料和目标岗位变成一轮可以复盘、重答的技术面试。接入自己的模型 API，先练独立表达，再根据原话证据改进下一次回答。
 
-[在线体验](https://techspar.cn/) · [下载桌面端](https://github.com/AnnaSuSu/TechSpar/releases) · [快速开始](#快速开始) · [English](README.en.md)
+![面试准备](images/personal-interview-setup.png)
 
-[![Release](https://img.shields.io/github/v/release/AnnaSuSu/TechSpar?color=6E56CF)](https://github.com/AnnaSuSu/TechSpar/releases)
-[![Status](https://img.shields.io/badge/状态-持续开发中-2EA043.svg)](https://github.com/AnnaSuSu/TechSpar/commits/main)
+截图使用合成资料和模拟网关。
 
-![TechSpar 产品总览](images/techspar-overview.png)
+## 一轮练习
 
-</div>
+1. **准备**：选择简历、JD、项目资料、目标岗位与训练模式，开始时冻结材料版本。
+2. **模拟**：严格模拟先独立作答；教练练习可主动请求提示。切回页面可继续原会话。
+3. **复盘**：报告逐段保存，正文先读，画像后台同步。逐题生成并缓存参考答法。
+4. **重答**：再次作答，比较原回答和新回答，分别记录技术缺口与表达练法。
 
-## 这是什么
+| 工程问题 | 当前实现 |
+| --- | --- |
+| 更新资料影响旧面试依据 | 会话保留材料内容与版本，不回写历史快照 |
+| 编辑失败丢失原资料 | revision 冲突检查，解析与向量化成功后再事务提交，失败保留原文件 |
+| 看过参考答案仍然不会表达 | 单独保存重答，缺口引用原话，不覆盖原始问答或成绩 |
+| 断线后重复调用、离页看不到进度 | 请求标识去重、答法缓存、会话恢复和报告分阶段展示 |
+| 模型参数在不同功能中不一致 | 兼容/Responses 适配，测试和调用共用配置，不自动更换模型或强度 |
 
-市面上的面试工具大多做同一件事：给你生成一堆题，你答完，结束。没有人记得你上次哪道题答崩了，也没有人知道你下周要面的那家公司想听什么。
+由 **xbzz1018** 维护。实现位置、设计取舍与验证方法见 [训练闭环案例](docs/project-case.md)。
 
-TechSpar 想做的是另一件事——**让每一次练习都算数**。专项训练、简历面试、JD 备面、实时 Copilot、录音复盘共用同一套长期画像、知识库、薄弱点和复习调度；每轮结果写回系统，决定下一轮练什么。
+## 三套配色
 
-适合正在准备技术面试、并且愿意用工具持续记录自己进步的人。
+雾白墨蓝、深灰青绿、米白酒红可从顶部、侧栏或设置切换。自动保存，桌面重启或本机端口改变后仍保留。
 
-## 功能闭环
+![三套主题](images/appearance-themes.png)
 
-- **专项强化训练**：结合题库、知识库、历史薄弱点和掌握度动态出题。
-- **简历模拟面试**：读取简历并按自我介绍、技术问题、项目深挖、反问环节推进。
-- **JD 定向备面**：拆解岗位描述，结合简历与历史画像生成岗位相关策略和问题。
-- **实时 Copilot**：实时 ASR、追问方向预测、回答建议、风险提示，以及可选声纹角色识别。
-- **录音复盘**：转写长短录音，结构化 Q&A，输出逐题分析与改进建议。
-- **长期画像**：汇总强项、薄弱点、训练轨迹，并通过 SM-2 安排复习。
-- **个人资料库**：导入 PDF、DOCX、Markdown 和文本，为训练与个人 Agent 提供上下文。
-- **数据迁移**：导出/导入单账户或管理员全站归档；个人敏感凭证默认不导出。
+主要入口是面试、复盘、资料、简历、专项和能力记录；录音、知识库、图谱与 Copilot 放在更多工具中。
 
-想看实际效果，直接去 [在线体验](https://techspar.cn/)，比截图直观。
+## 技术栈
 
-## 快速开始
+| 层次 | 技术与职责 |
+| --- | --- |
+| 界面 | React、TypeScript、Vite、Tailwind；表单、问答流与训练记录 |
+| API | Hono、Bun；REST/SSE/WebSocket 与契约校验 |
+| 业务 | TypeScript 用例、状态机和端口；材料、面试、复盘与重答规则 |
+| 数据 | SQLite、文件存储；会话、资料版本与可重建向量 |
+| 模型 | OpenAI 兼容/Responses；本地 ONNX 或外部 Embedding |
+| 桌面 | Electron + 编译 Bun sidecar，同源界面与本机动态端口 |
 
-### 环境要求
+## 运行与构建
 
-- Bun `1.3.14` 或兼容的 `1.3.x`
-- macOS、Linux 或 Windows
-
-以下环境要求和命令适用于源码开发与自行部署。
-
-源码开发或本机构建先执行：
+使用锁定的 Bun `1.3.14` 或兼容版本，Node 用于前端测试：
 
 ```bash
-git clone https://github.com/AnnaSuSu/TechSpar.git
-cd TechSpar
 bun install --frozen-lockfile
-cp .env.example .env
-```
-
-### Electron 桌面客户端
-
-可从 [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) 下载 macOS 与 Windows 安装包，联网登录后使用。以下命令用于从源码构建带有本地后端的桌面应用。
-
-开发模式会同时启动 Vite、Hono 和 Electron：
-
-```bash
 bun run dev:desktop
 ```
 
-构建当前平台的可运行应用目录：
+首次进入填写自己的模型基础地址、模型 ID 和 API Key，支持 Chat Completions 与 Responses 网关。无需固定厂商或固定模型。
 
-```bash
-bun run pack:desktop
+本地 Embedding 用于资料检索和长期记忆，简历模拟读取所选材料全文；首次使用本地向量需要下载模型。文字 API 不能代替语音等可选服务。见 [设置](docs/settings.md) 与 [外部服务](docs/external-services.md)。
+
+Windows 个人包：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-personal.ps1
 ```
 
-构建当前平台的安装包/归档文件：
+构建后运行 `启动面试练习室.cmd`。程序在 `dist/desktop-interview-room-themes/win-unpacked/`，个人数据在 `local_tools/personal-data/`，均不进入 Git。完整程序目录需要一起保留。当前尚未发布个人版安装包。
+
+## 验证
 
 ```bash
-bun run dist:desktop
+bun run typecheck
+bun run typecheck:node
+bun run check:boundaries
+bun run test
+bun run check:frontend
+bun run smoke:personal-desktop
 ```
 
-按目标平台构建：
+最后一项需要已打包的 Windows 客户端和缓存的中文 Embedding，创建隔离合成账号并使用本机模拟网关。模拟流程与测试数量不能代替真实模型质量评估。
 
-```bash
-bun run dist:desktop:mac-arm64 # macOS Apple Silicon：DMG + ZIP
-bun run dist:desktop:win-x64   # Windows x64：NSIS 安装包
-```
+## 当前限制与下一步
 
-产物位于 `dist/desktop/`。当前仓库配置了 macOS DMG/ZIP、Windows NSIS、Linux AppImage/DEB。自行构建的应用自带 Electron 和编译后的 Bun 后端，运行时不需要另外安装 Bun。
+- 高推理强度和网关时延仍可能使报告等待一两分钟；分阶段展示不保证推理加速。
+- 未完整生成的报告重启后需要重新生成，重答尚未作为可恢复后台任务运行。
+- 资料旧版本暂留，无版本回滚界面。每轮最多 8 份资料库文档、48000 字，连同默认简历最多 60000 字。
+- 模型可能给出错误建议；未知职责和数字应标为待补充，参考解法不能代替真实经历。
+- 固定场景质量评估、检索回归和部分语音/跨平台实测仍待完成。
 
-### Web 本地开发
+见 [项目案例](docs/project-case.md)、[架构与选型](docs/typescript-backend-architecture.md)、[改进计划](docs/project-roadmap.md) 和 [个人产品实施计划](docs/personal-project-plan.md)。
 
-首次启动 API 前先运行 `cp .env.example .env`，并为 `JWT_SECRET`、`VOICEPRINT_ENCRYPTION_KEY` 和 `DEFAULT_PASSWORD` 设置安全值；服务会拒绝 JWT 和密码的示例占位值。
+## 来源与许可
 
-终端一启动 API：
-
-```bash
-bun run dev:api
-```
-
-终端二启动 Web：
-
-```bash
-bun run dev:web
-```
-
-访问 <http://localhost:5173>。服务端不再提供固定默认密码。Electron 桌面版会生成随机的本机凭证并自动进入。
-
-### Docker
-
-```bash
-docker compose up --build
-```
-
-启动后访问 <http://localhost>。
-
-## 模型与服务配置
-
-自行部署或从源码构建桌面应用时，在“设置”中填写 LLM、Embedding、DashScope、Tavily、OSS 与腾讯云 VPR 密钥。密钥默认按用户隔离保存在本地数据目录；`.env` 只放启动配置和可选的平台兜底模型。
-
-- **LLM**：任意 OpenAI-compatible API。
-- **Embedding API**：任意 OpenAI-compatible embeddings 接口；完整的 `/v1/embeddings` 地址会自动归一化。
-- **本地 Embedding**：使用 Transformers.js + ONNX，默认 `Xenova/bge-m3`；首次运行自动下载并缓存，不需要 Python、PyTorch 或 pip。
-- **DashScope**：语音输入、录音转写和 Copilot 实时 ASR。
-- **Tavily**：Copilot 公司信息搜索。
-- **阿里云 OSS**：长录音异步转写的临时对象存储。
-- **腾讯云 VPR**：可选的 HR/候选人声纹区分。
-
-## 质量检查
-
-```bash
-bun run check
-```
-
-该命令依次执行 Bun/Node 类型检查、架构边界检查、后端与前端测试、前端 TypeScript/ESLint，以及 API、Web、Electron 主进程和编译 sidecar 构建。OpenAPI 文件和前端类型可通过以下命令重新生成：
-
-```bash
-bun run gen:api
-```
-
-桌面端还有三条独立验收命令：
-
-```bash
-bun run smoke:desktop          # Electron + Hono 启动链路
-bun run smoke:local-embedding  # 编译后端执行真实 ONNX 本地向量
-bun run pack:desktop           # 当前平台完整应用目录
-```
-
-## 数据与备份
-
-默认数据位于 `data/`：SQLite 保存会话和任务状态，用户文件位于 `data/users/{user_id}/`。在“设置 → 数据迁移”中可以：
-
-- 导出当前账户的可移植备份；敏感凭证需要显式选择才会包含；
-- 将个人备份导入另一个账户，数据会安全重绑定到当前用户；
-- 管理员导出完整系统备份。
-
-归档会验证路径、链接、tar 校验和与解压上限；向量索引作为派生数据在导入后重建。
-
-管理员系统归档的恢复是离线运维操作。先把归档放在目标 `data/` 之外并执行只读预检：
-
-```bash
-bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-dir=/srv/techspar/data
-```
-
-预检通过后停止 TechSpar API、桌面 sidecar 和其他所有可能写入该目录的进程，再显式确认恢复：
-
-```bash
-bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-dir=/srv/techspar/data --confirm
-```
-
-恢复会先构建并校验暂存数据，再原子切换目录；原 `data/` 会保留为同级、带时间戳的 `data.before-system-restore-*` 备份目录，不会直接删除。
-
-Electron 使用系统标准的应用数据目录，数据库、用户文件、模型缓存和每次安装随机生成的运行密钥都放在那里；本地 Hono sidecar 只监听 `127.0.0.1` 的动态端口。
-
-## 参与贡献
-
-欢迎提交 [Issue](https://github.com/AnnaSuSu/TechSpar/issues) 或 PR。开发约定和流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
-## 旧版本
-
-`legacy/python-backend` 是迁移前最后一个 Python + FastAPI 版本，固定在提交 `73d1a7c`，只作为历史归档，不再接收新功能。查看方式见 [旧版本分支说明](docs/legacy-python-backend.md)。
-
-## 致谢
-
-感谢 [LINUX DO](https://linux.do/) 社区，以及 Magic Resume 原作者 [@JOYCEQL](https://github.com/JOYCEQL)。
+[AGPL v3](LICENSE) · [来源与修改说明](NOTICE.md) · [简历模块条款](frontend/src/resume/LICENSE)。简历模块的分发事项见改进计划。

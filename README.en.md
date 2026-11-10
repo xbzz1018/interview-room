@@ -1,124 +1,47 @@
-<div align="center">
+# Interview Room · 面试练习室
 
-<img src="images/techspar-horizontal-logo.svg" alt="TechSpar" width="520" />
+<img src="images/interview-room-mark.svg" alt="Interview Room mark" width="72" />
 
-**Connect focused drills, resume interviews, JD prep, realtime Copilot, and recording review into one continuously improving technical interview loop.**
+Personal technical interview practice using your resume, project evidence and target job description. Connect your own model API, answer independently, review the evidence and retry in your own words.
 
-[Online Demo](https://techspar.cn/) · [Quick Start](#quick-start) · [中文](README.md)
+[中文说明](README.md) · [Case study](docs/project-case.md) · [Roadmap](docs/project-roadmap.md) · [Attribution](NOTICE.md)
 
-[![Bun](https://img.shields.io/badge/Bun-1.3+-000000.svg)](https://bun.sh/)
-[![Hono](https://img.shields.io/badge/Hono-4-E36002.svg)](https://hono.dev/)
-[![Electron](https://img.shields.io/badge/Electron-43-47848F.svg)](https://www.electronjs.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+![Interview preparation using synthetic materials](images/personal-interview-setup.png)
 
-![TechSpar product overview](images/techspar-overview.png)
-</div>
+## Practice loop
 
-TechSpar is more than a question generator. Focused drills, resume interviews, JD prep, realtime Copilot, and recording review share the same long-term profile, knowledge base, weak points, and review schedule. Every result changes what the next round focuses on.
+1. Select the resume, JD and project materials. A session preserves their content and versions.
+2. Choose a strict simulation or coaching practice. Return to an existing session to continue.
+3. Read the report as it is saved; profile synchronization continues separately. Generate and cache reference answers per question.
+4. Answer again and compare technical and expression gaps, with quotes checked against the original answers.
 
-## Versions and branches
+The interface offers three persistent themes. Screenshots use synthetic materials and a local mock gateway.
 
-- **`main`** is the current product. The backend is fully TypeScript, Bun, and Hono, with one Bun workspace for backend and frontend dependencies. All new work continues here.
-- **`legacy/python-backend`** preserves the final Python and FastAPI implementation at commit `73d1a7c`. It is a read-only historical fallback and receives no new features.
+![Three themes](images/appearance-themes.png)
 
-Never run both branches against the same writable data directory. Use a separate checkout and a copied dataset when inspecting the legacy implementation.
+## Development
 
-## Capabilities
-
-- Adaptive focused drills backed by knowledge, mastery, and training history
-- Resume mock interviews with a durable TypeScript state machine
-- JD-specific preparation and questioning strategies
-- Realtime Copilot with ASR, follow-up prediction, answer guidance, alerts, and optional voiceprint roles
-- Long and short recording transcription with structured review
-- Long-term profile, weak-point tracking, and SM-2 review scheduling
-- Personal document library and personal Agent context
-- Safe per-account and administrator data migration archives
-
-## Quick start
-
-Requirements: Bun `1.3.14` or a compatible `1.3.x` release.
+The existing stack is TypeScript, React, Hono/Bun, SQLite and Electron. Use Bun 1.3.14 or a compatible version, with Node for frontend tests:
 
 ```bash
-git clone https://github.com/AnnaSuSu/TechSpar.git
-cd TechSpar
 bun install --frozen-lockfile
-cp .env.example .env
-```
-
-### Electron desktop client
-
-Download macOS and Windows installers from [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) and sign in online to use them. The commands below build a desktop application with a local backend from source.
-
-Before starting the API, copy `.env.example` to `.env` and replace the sample values for `JWT_SECRET`, `VOICEPRINT_ENCRYPTION_KEY`, and `DEFAULT_PASSWORD`. The server refuses to start while JWT or password placeholders remain.
-
-Run Vite, Hono, and Electron together in development:
-
-```bash
 bun run dev:desktop
 ```
 
-Build an unpacked application or distributable artifacts for the current platform:
+Configure your own model base URL, model ID, API key and Chat Completions or Responses protocol in settings. Local ONNX or an external embedding service supports retrieval; optional speech services need their own configuration.
 
-```bash
-bun run pack:desktop
-bun run dist:desktop
+For a Windows personal build:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-personal.ps1
 ```
 
-Build for a specific target platform:
+Run `启动面试练习室.cmd` after building. Keep the full application directory. Build output and local account data are ignored by Git. No personal installer has been published.
 
-```bash
-bun run dist:desktop:mac-arm64 # macOS Apple Silicon: DMG + ZIP
-bun run dist:desktop:win-x64   # Windows x64: NSIS installer
-```
+## Validation and limits
 
-Artifacts are written to `dist/desktop/`. Applications built from source include Electron and a compiled Bun backend, so end users do not need Bun. The repository configures macOS DMG/ZIP, Windows NSIS, and Linux AppImage/DEB targets.
+See the Chinese README for the exact check commands. Unit, contract and isolated desktop checks verify behavior and failure handling; a mock gateway does not establish real model answer quality. High reasoning effort can still cause long waits. Interrupted report generation restarts rather than resuming tokens, and answer comparison is not yet a durable background job.
 
-### Web development
+## Origin and licensing
 
-Start the API and Web app in separate terminals:
-
-```bash
-bun run dev:api
-bun run dev:web
-```
-
-Open <http://localhost:5173>. The server no longer has a fixed default password. The Electron desktop app creates random local credentials and signs in automatically.
-
-Docker is also supported:
-
-```bash
-docker compose up --build
-```
-
-Then open <http://localhost>.
-
-## Models and optional services
-
-When self-hosting or building the desktop application from source, configure LLM, embedding, DashScope, Tavily, OSS, and Tencent VPR credentials in Settings. Credentials are user-scoped. `.env` only contains bootstrap settings and optional platform fallback models.
-
-- Any OpenAI-compatible chat and embeddings API is supported.
-- Local embeddings use Transformers.js and ONNX. The default is `Xenova/bge-m3`; it downloads and caches on first use with no Python, PyTorch, or pip dependency.
-- DashScope powers voice input, recording transcription, and Copilot realtime ASR.
-- Tavily adds company research, OSS supports long-audio jobs, and Tencent VPR optionally distinguishes interviewer and candidate voices.
-
-## Validation
-
-```bash
-bun run check
-bun run gen:api
-```
-
-The first command runs Bun and Node type checks, architecture checks, backend and frontend tests, and production builds. The second regenerates OpenAPI and frontend types.
-
-Desktop-specific validation is available through `bun run smoke:desktop`, `bun run smoke:local-embedding`, and `bun run pack:desktop`.
-
-## Data and backups
-
-Data defaults to `data/`: SQLite stores sessions and tasks, while user files live under `data/users/{user_id}/`. The Settings page exports portable personal backups and administrator system backups. Imports validate paths, links, tar checksums, and expanded size, then safely rebind personal data to the current account. Vector indexes are rebuilt after import.
-
-Electron uses the operating system's standard application-data directory for databases, user files, model caches, and per-install random runtime secrets. Its Hono sidecar listens only on a dynamic `127.0.0.1` port.
-
-## Contributing
-
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
+Maintained by **xbzz1018**. [AGPL v3](LICENSE) · [Origin and changes](NOTICE.md) · [Resume module terms](frontend/src/resume/LICENSE). Resume module distribution remains a release prerequisite in the roadmap.

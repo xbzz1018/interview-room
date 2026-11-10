@@ -1,16 +1,19 @@
-# React + Vite
+# 面试练习室：界面开发
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React / TypeScript / Vite 界面，同时服务浏览器与 Electron Renderer。完整安装和个人包启动方式见 [项目首页](../README.md)，来源与个人增量见 [NOTICE](../NOTICE.md)。
 
-Currently, two official plugins are available:
+从仓库根目录执行：
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+bun install --frozen-lockfile
+bun run dev:web
+bun run check:frontend
+bun run test:web
+bun run build:web
+```
 
-## React Compiler
+开发 Web 还需单独运行 API；桌面联调使用 `bun run dev:desktop`。API 类型由 `bun run gen:api` 生成，不手写 `src/api/schema.d.ts`。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+主要入口为面试准备、复盘重练、资料库、简历、专项和能力记录。三主题共用语义颜色变量；桌面偏好通过最小 IPC 持久化，避免随机端口导致设置丢失。核心实现说明见 [项目案例](../docs/project-case.md)。
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+历史 JSX 页面可逐步迁移，新增共享逻辑与 API 使用 TypeScript。不要把真实简历、问答、网关凭据或本机截图放进公共 fixture。
