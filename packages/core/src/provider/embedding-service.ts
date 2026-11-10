@@ -42,7 +42,16 @@ export class EmbeddingService implements EmbeddingUseCases {
       cached = { signature, driver: this.drivers.create(config) }
       this.cache.set(key, cached)
     }
-    return (await cached.driver).embed(texts, context.signal)
+    let driver: EmbeddingDriver
+    try {
+      driver = await cached.driver
+    } catch (error) {
+      // A failed model download must not poison this user's cache until restart.
+      // Keep a newer configuration/reset's entry if it replaced the failed promise.
+      if (this.cache.get(key) === cached) this.cache.delete(key)
+      throw error
+    }
+    return driver.embed(texts, context.signal)
   }
 
   async signature(context: RequestContext): Promise<string> {
