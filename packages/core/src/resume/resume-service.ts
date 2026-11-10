@@ -102,24 +102,28 @@ export class ResumeService implements ResumeUseCases {
 
   async text(context: RequestContext): Promise<string> {
     const file = await this.deps.store.read(this.userId(context))
-    return file ? (await this.deps.extractor.extract(file.filename, file.bytes)).trim() : ''
+    if (!file) return ''
+    const text = (await this.deps.extractor.extract(file.filename, file.bytes)).trim()
+    if (!text) throw new AppError('无法从 PDF 提取文本，请上传可复制文字的 PDF；扫描件需先进行 OCR。', 422, 'document_text_empty')
+    return text
   }
 
   async parse(context: RequestContext) {
     const file = await this.deps.store.read(this.userId(context))
     if (!file) throw new AppError('请先上传简历', 400)
     const text = (await this.deps.extractor.extract(file.filename, file.bytes)).trim()
-    if (!text) throw new AppError('无法从 PDF 提取文本(可能是扫描件或图片型简历)', 500)
+    if (!text) throw new AppError('无法从 PDF 提取文本，请上传可复制文字的 PDF；扫描件需先进行 OCR。', 422, 'document_text_empty')
     const messages = [
       { role: 'system' as const, content: '你是简历解析引擎。只返回 JSON，不要其他内容。' },
       { role: 'user' as const, content: RESUME_PARSE_PROMPT.replace('{{resume_text}}', text.slice(0, MAX_PARSE_CHARS)) },
     ]
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await this.deps.ai.complete(context, messages, STRUCTURED_CHAT_OPTIONS)
       try {
-        const parsed = parseJsonResponse(await this.deps.ai.complete(context, messages, STRUCTURED_CHAT_OPTIONS))
+        const parsed = parseJsonResponse(response)
         return { ok: true as const, parsed: validateResume(parsed) }
-      } catch (error) {
-        if (attempt === 1) throw new AppError('简历解析失败，请重试', 500)
+      } catch {
+        if (attempt === 1) throw new AppError('简历解析失败，请重试', 502, 'resume_parse_failed')
       }
     }
     throw new AppError('简历解析失败，请重试', 500)
@@ -132,6 +136,7 @@ export class ResumeService implements ResumeUseCases {
     try {
       return { text: await this.deps.transcription.transcribe(context, bytes, suffix) }
     } catch (error) {
+      if (error instanceof AppError) throw error
       throw new AppError(`Transcription failed: ${error instanceof Error ? error.message : String(error)}`, 500)
     }
   }

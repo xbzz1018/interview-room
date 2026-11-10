@@ -31,7 +31,7 @@ const child = Bun.spawn([executable], {
     TECHSPAR_BASE_DIR: root,
     TECHSPAR_DATA_DIR: join(root, 'data'),
     DB_PATH: join(root, 'data', 'interviews.db'),
-    TECHSPAR_MODEL_CACHE_DIR: join(root, 'models'),
+    TECHSPAR_MODEL_CACHE_DIR: process.env.TECHSPAR_SMOKE_MODEL_CACHE || join(root, 'models'),
     JWT_SECRET: 'local-embedding-smoke-jwt-secret-with-at-least-32-chars',
     VOICEPRINT_ENCRYPTION_KEY: 'local-embedding-smoke-voiceprint-key-with-32-chars',
     DEFAULT_EMAIL: 'admin@techspar.local',
@@ -49,7 +49,7 @@ try {
     if (lines.some((line) => { try { return (JSON.parse(line) as { event?: string }).event === 'techspar:ready' } catch { return false } })) break
   }
   const origin = `http://127.0.0.1:${port}`
-  const login = await fetch(`${origin}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@techspar.local', password: 'admin123' }) })
+  const login = await fetch(`${origin}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@techspar.local', password: 'local-embedding-smoke-password' }) })
   if (!login.ok) throw new Error(`Login failed: ${login.status} ${await login.text()}`)
   const token = (await login.json() as { token: string }).token
   const model = process.env.TECHSPAR_SMOKE_EMBEDDING_MODEL || 'Xenova/all-MiniLM-L6-v2'

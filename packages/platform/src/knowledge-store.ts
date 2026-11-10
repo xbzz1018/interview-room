@@ -4,6 +4,7 @@ import type { DocumentTextExtractor, KnowledgeFile, KnowledgeStore, Topic, Topic
 import presetTopicsJson from '../assets/preset-topics.json' with { type: 'json' }
 import { extractOfficeXmlEntries } from './office-archive.ts'
 import { atomicWriteJson } from './provider-settings-repository.ts'
+import { extractPdfText } from './pdf-text.ts'
 
 type PresetTopic = Topic & { key: string; readme: string }
 const presetTopics = presetTopicsJson as PresetTopic[]
@@ -193,15 +194,7 @@ export class PortableDocumentTextExtractor implements DocumentTextExtractor {
       )
     }
     if (suffix === '.pdf') {
-      const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
-      const document = await getDocument({ data: bytes }).promise
-      const pages: string[] = []
-      for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-        const page = await document.getPage(pageNumber)
-        const text = await page.getTextContent()
-        pages.push(text.items.map((item) => 'str' in item ? item.str : '').join(' '))
-      }
-      return pages.join('\n')
+      return extractPdfText(bytes)
     }
     return ''
   }

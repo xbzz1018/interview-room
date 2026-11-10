@@ -2,25 +2,29 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { ResumeService, type ChatMessage } from '@techspar/core'
+import { AppError, ResumeService, type ChatMessage } from '@techspar/core'
 import { FileResumeStore } from '@techspar/platform'
 
 describe('resume compatibility', () => {
   let root: string
   let responses: string[]
   let service: ResumeService
+  let aiError: Error | undefined
+  let extracted: string
   const context = { requestId: 'test', userId: 'user-a', signal: new AbortController().signal }
   const pdf = new TextEncoder().encode('%PDF-1.7\nresume bytes')
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'techspar-resume-'))
     responses = []
+    aiError = undefined
+    extracted = '  完整简历原文\n第二行  '
     service = new ResumeService({
       store: new FileResumeStore(join(root, 'data')),
-      extractor: { async extract() { return '  完整简历原文\n第二行  ' } },
+      extractor: { async extract() { return extracted } },
       index: { async invalidate() {} },
       ai: {
-        async complete(_context, _messages: readonly ChatMessage[]) { return responses.shift() || '{}' },
+        async complete(_context, _messages: readonly ChatMessage[]) { if (aiError) throw aiError; return responses.shift() || '{}' },
         async *stream() {},
       },
       transcription: { async transcribe() { return '转写文本' } },
@@ -56,6 +60,13 @@ describe('resume compatibility', () => {
     expect(await service.text(context)).toBe('完整简历原文\n第二行')
   })
 
+  test('reports image-only resume PDFs before calling a model', async () => {
+    await service.upload(context, 'scan.pdf', pdf)
+    extracted = '  '
+    await expect(service.text(context)).rejects.toMatchObject({ status: 422, code: 'document_text_empty' })
+    await expect(service.parse(context)).rejects.toMatchObject({ status: 422, code: 'document_text_empty' })
+  })
+
   test('retries JSON parsing once and returns a structured object', async () => {
     await service.upload(context, 'resume.pdf', pdf)
     responses.push('not json', '```json\n{"basic":{"name":"张三"}}\n```')
@@ -66,6 +77,12 @@ describe('resume compatibility', () => {
     await service.upload(context, 'resume.pdf', pdf)
     responses.push('"not-an-object"', '{"basic":{"name":"李四"}}')
     expect(await service.parse(context)).toEqual({ ok: true, parsed: { basic: { name: '李四' }, education: [], experience: [], projects: [], skills: [], selfEvaluation: [] } })
+  })
+
+  test('preserves actionable provider failures instead of hiding them as resume parsing errors', async () => {
+    await service.upload(context, 'resume.pdf', pdf)
+    aiError = new AppError('请检查 API Key', 502, 'provider_auth_failed')
+    await expect(service.parse(context)).rejects.toBe(aiError)
   })
 
   test('deletes the PDF and returns 404 when repeated', async () => {
