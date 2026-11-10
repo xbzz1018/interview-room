@@ -8,7 +8,7 @@ export const DEFAULT_EMBEDDING_BATCH_SIZE = 10
 
 export type ProviderSource = typeof USER_PROVIDER | typeof PLATFORM_PROVIDER
 
-export type LlmCompatibility = 'generic' | 'deepseek'
+export type LlmCompatibility = 'generic' | 'deepseek' | 'responses'
 export type ChatReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export type LlmSettings = {
@@ -17,6 +17,7 @@ export type LlmSettings = {
   model: string
   temperature: number
   compatibility: LlmCompatibility
+  http_headers?: Record<string, string>
   /**
    * 空值保留兼容模式的默认行为；显式档位优先于调用场景的默认推理强度。
    *

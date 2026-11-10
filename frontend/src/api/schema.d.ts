@@ -327,7 +327,10 @@ export interface paths {
                                  * @default generic
                                  * @enum {string}
                                  */
-                                compatibility: "generic" | "deepseek";
+                                compatibility: "generic" | "deepseek" | "responses";
+                                http_headers?: {
+                                    [key: string]: string;
+                                };
                                 /** @enum {string} */
                                 reasoning_effort?: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
                                 /** @default false */
@@ -460,7 +463,10 @@ export interface paths {
                              * @default generic
                              * @enum {string}
                              */
-                            compatibility?: "generic" | "deepseek";
+                            compatibility?: "generic" | "deepseek" | "responses";
+                            http_headers?: {
+                                [key: string]: string;
+                            };
                             /** @enum {string} */
                             reasoning_effort?: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
                             /** @default false */
@@ -675,7 +681,10 @@ export interface paths {
                          * @default generic
                          * @enum {string}
                          */
-                        compatibility?: "generic" | "deepseek";
+                        compatibility?: "generic" | "deepseek" | "responses";
+                        http_headers?: {
+                            [key: string]: string;
+                        };
                         /** @enum {string} */
                         reasoning_effort?: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
                         /** @default false */

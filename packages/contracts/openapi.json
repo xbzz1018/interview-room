@@ -2958,9 +2958,18 @@
                           "type": "string",
                           "enum": [
                             "generic",
-                            "deepseek"
+                            "deepseek",
+                            "responses"
                           ],
                           "default": "generic"
+                        },
+                        "http_headers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 2048,
+                            "pattern": "^[\\t\\x20-\\x7e\\x80-\\xff]*$"
+                          }
                         },
                         "reasoning_effort": {
                           "type": "string",
@@ -3202,9 +3211,18 @@
                         "type": "string",
                         "enum": [
                           "generic",
-                          "deepseek"
+                          "deepseek",
+                          "responses"
                         ],
                         "default": "generic"
+                      },
+                      "http_headers": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "maxLength": 2048,
+                          "pattern": "^[\\t\\x20-\\x7e\\x80-\\xff]*$"
+                        }
                       },
                       "reasoning_effort": {
                         "type": "string",
@@ -3545,9 +3563,18 @@
                     "type": "string",
                     "enum": [
                       "generic",
-                      "deepseek"
+                      "deepseek",
+                      "responses"
                     ],
                     "default": "generic"
+                  },
+                  "http_headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "pattern": "^[\\t\\x20-\\x7e\\x80-\\xff]*$"
+                    }
                   },
                   "reasoning_effort": {
                     "type": "string",

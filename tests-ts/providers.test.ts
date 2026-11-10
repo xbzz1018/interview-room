@@ -206,7 +206,7 @@ describe('chat provider compatibility', () => {
     }) as typeof fetch })
     await expect(factory.create({ ...config, reasoning_effort: 'max' }).complete(
       [{ role: 'user', content: 'question' }], new AbortController().signal,
-    )).rejects.toThrow('Unsupported reasoning_effort: max')
+    )).rejects.toMatchObject({ status: 502, code: 'provider_request_rejected' })
     expect(requests).toHaveLength(1)
     expect(requests[0]?.reasoning_effort).toBe('max')
   })

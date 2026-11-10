@@ -1,7 +1,11 @@
 import OpenAI from 'openai'
+import { createResponsesDriver } from './responses.ts'
+import { loadLocalTransformers } from './local-transformers.ts'
+import { providerError, withProviderErrors } from './provider-errors.ts'
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 import {
   DEFAULT_EMBEDDING_MODEL,
+  AppError,
   ProviderResponseError,
   embeddingModeOf,
   normalizeEmbeddingApiBase,
@@ -85,11 +89,13 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
     const client = new OpenAI({
       apiKey: config.api_key,
       baseURL: config.api_base || undefined,
+      defaultHeaders: config.http_headers,
       ...(this.options.fetch ? { fetch: this.options.fetch } : {}),
     })
     const retryDelaysMs = this.options.retryDelaysMs || DEFAULT_EMPTY_COMPLETION_RETRY_DELAYS_MS
     const sleep = this.options.sleep || abortableSleep
-    return {
+    if (config.compatibility === 'responses') return withProviderErrors(createResponsesDriver(client, config, { retryDelaysMs, sleep }))
+    return withProviderErrors({
       async complete(messages: readonly ChatMessage[], signal: AbortSignal, options?: ChatCompleteOptions) {
         let promptTokens = 0
         let completionTokens = 0
@@ -153,7 +159,7 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
           throw new ProviderResponseError('模型在生成回答前已耗尽本次输出预算，请调低推理强度后重试。')
         }
       },
-    }
+    })
   }
 }
 
@@ -224,24 +230,25 @@ export class OpenAiEmbeddingDriverFactory implements EmbeddingDriverFactory {
       })
       return {
         async embed(texts, signal) {
-          return (await client.embed(texts, signal)).map((vector) => Float32Array.from(vector))
+          try { return (await client.embed(texts, signal)).map((vector) => Float32Array.from(vector)) }
+          catch (error) { throw providerError(error, signal) }
         },
       }
     }
 
-    const { env, pipeline } = await import('@huggingface/transformers')
-    const cacheDir = process.env.TECHSPAR_MODEL_CACHE_DIR?.trim()
-    if (cacheDir) env.cacheDir = cacheDir
     const model = config.local_path || config.local_model || DEFAULT_EMBEDDING_MODEL
     type FeatureExtractor = (texts: string[], options: { pooling: 'mean'; normalize: true }) => Promise<{ tolist(): number[][] }>
     let extractor: FeatureExtractor
     try {
+      const { env, pipeline } = await loadLocalTransformers()
+      const cacheDir = process.env.TECHSPAR_MODEL_CACHE_DIR?.trim()
+      if (cacheDir) env.cacheDir = cacheDir
       extractor = await (pipeline as unknown as (task: 'feature-extraction', target: string, options: { dtype: 'fp32' }) => Promise<FeatureExtractor>)('feature-extraction', model, { dtype: 'fp32' })
     } catch (error) {
       if (config.local_path) {
-        throw new Error(`无法加载本地 Embedding 路径 ${config.local_path}。TypeScript 版本只支持 Transformers.js/ONNX 模型目录；旧 sentence-transformers/PyTorch 目录不能直接复用，请改用 ${DEFAULT_EMBEDDING_MODEL} 或先导出 ONNX 模型。`, { cause: error })
+        throw new AppError('无法加载本地 Embedding 目录，请选择包含完整 Transformers.js/ONNX 文件的模型目录；PyTorch 模型目录不能直接使用。', 422, 'embedding_initialization_failed')
       }
-      throw error
+      throw new AppError('本地 Embedding 初始化失败，请检查模型名称、模型下载网络及桌面版运行依赖，或在设置中改用向量 API 后重试。', 422, 'embedding_initialization_failed')
     }
     return {
       async embed(texts, signal) {

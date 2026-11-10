@@ -38,7 +38,8 @@ export function normalizeLlmSettings(settings?: Partial<LlmSettings>): LlmSettin
     api_key: settings?.api_key || '',
     model: settings?.model || '',
     temperature: typeof settings?.temperature === 'number' ? settings.temperature : 0.7,
-    compatibility: settings?.compatibility === 'deepseek' ? 'deepseek' : 'generic',
+    compatibility: settings?.compatibility === 'deepseek' || settings?.compatibility === 'responses' ? settings.compatibility : 'generic',
+    ...(settings?.http_headers ? { http_headers: { ...settings.http_headers } } : {}),
     reasoning_effort: settings?.reasoning_effort || '',
     use_platform: settings?.use_platform === true,
   }

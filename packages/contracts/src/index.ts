@@ -58,7 +58,14 @@ export const LlmSettingsSchema = z.object({
   api_key: z.string().default(''),
   model: z.string().default(''),
   temperature: z.number().min(0).max(2).default(0.7),
-  compatibility: z.enum(['generic', 'deepseek']).default('generic'),
+  compatibility: z.enum(['generic', 'deepseek', 'responses']).default('generic'),
+  http_headers: z.record(
+    z.string().max(128).regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/).refine(
+      name => !['authorization', 'host', 'content-type', 'content-length', 'connection', 'transfer-encoding', 'cookie', 'proxy-authorization'].includes(name.toLowerCase()),
+      '请在 API Key 字段填写凭据，附加请求头不能覆盖认证或传输配置',
+    ),
+    z.string().max(2048).regex(/^[\t\x20-\x7e\x80-\xff]*$/),
+  ).refine(headers => Object.keys(headers).length <= 16, '附加请求头最多 16 项').optional(),
   reasoning_effort: z.enum(['', 'none', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   /** 显式选用部署方的共享 key,即使自己也填了 key */
   use_platform: z.boolean().default(false),
