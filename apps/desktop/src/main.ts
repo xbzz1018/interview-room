@@ -4,8 +4,8 @@ import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { BackendSupervisor, type BackendLaunch, type BackendReady } from './backend-supervisor.ts'
-import { DESKTOP_APPEARANCE_READ_CHANNEL, DESKTOP_APPEARANCE_WRITE_CHANNEL, DESKTOP_AUDIO_SETTINGS_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
-import { configureAudioPermissions, openAudioSettings, sameOrigin } from './audio-permissions.ts'
+import { DESKTOP_APPEARANCE_READ_CHANNEL, DESKTOP_APPEARANCE_WRITE_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
+import { configureInterviewPermissions, sameOrigin } from './permissions.ts'
 import { loadOrCreateRuntimeSecrets } from './runtime-secrets.ts'
 import { AppearanceStore } from './appearance.ts'
 
@@ -90,7 +90,6 @@ function registerIpc(): void {
   const assertTrusted = (event: Electron.IpcMainInvokeEvent) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow?.webContents.mainFrame || !event.senderFrame?.url || !sameOrigin(event.senderFrame.url, rendererOrigin)) throw new Error('Untrusted IPC sender')
   }
-  ipcMain.handle(DESKTOP_AUDIO_SETTINGS_CHANNEL, async (event, kind: unknown) => { assertTrusted(event); await openAudioSettings(kind) })
   ipcMain.handle(DESKTOP_APPEARANCE_READ_CHANNEL, async (event) => { assertTrusted(event); return appearance.read() })
   ipcMain.handle(DESKTOP_APPEARANCE_WRITE_CHANNEL, async (event, theme: unknown) => { assertTrusted(event); await appearance.write(theme) })
   ipcMain.handle(DESKTOP_RUNTIME_CHANNEL, (event) => {
@@ -131,7 +130,7 @@ async function createWindow(): Promise<void> {
     },
   })
   mainWindow = window
-  configureAudioPermissions(window, rendererOrigin)
+  configureInterviewPermissions(window.webContents.session)
   window.once('ready-to-show', () => window.show())
   window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
   window.webContents.setWindowOpenHandler(({ url }) => {

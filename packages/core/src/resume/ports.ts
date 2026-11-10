@@ -38,5 +38,5 @@ export type ResumeDependencies = {
   extractor: ResumeTextExtractor
   index: ResumeIndexControl
   ai: TextGenerationUseCases
-  transcription: ShortTranscriptionUseCases
+  transcription?: ShortTranscriptionUseCases
 }

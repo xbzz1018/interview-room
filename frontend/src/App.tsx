@@ -16,9 +16,6 @@ import History from "./pages/History";
 import Profile from "./pages/Profile";
 import Knowledge from "./pages/Knowledge";
 import TopicDetail from "./pages/TopicDetail";
-import Graph from "./pages/Graph";
-import RecordingAnalysis from "./pages/RecordingAnalysis";
-import Copilot from "./pages/Copilot";
 import TopicDrill from "./pages/TopicDrill";
 import MockInterview from "./pages/MockInterview";
 import Settings from "./pages/Settings";
@@ -98,14 +95,14 @@ function AppRoutes() {
                 <Route path="/personal-agent" element={<PersonalAgent />} />
                 <Route path="/profile/topic/:topic" element={<TopicDetail />} />
                 <Route path="/knowledge" element={<Knowledge />} />
-                <Route path="/graph" element={<Graph />} />
-                <Route path="/recording" element={<RecordingAnalysis />} />
+                <Route path="/graph" element={<Navigate to="/profile" replace />} />
+                <Route path="/recording" element={<Navigate to="/history" replace />} />
                 <Route path="/mock-interview" element={<MockInterview />} />
                 <Route
                   path="/job-prep"
                   element={<Navigate to="/mock-interview?mode=targeted" replace />}
                 />
-                <Route path="/copilot" element={<Copilot />} />
+                <Route path="/copilot" element={<Navigate to="/history" replace />} />
                 <Route path="/topic-drill" element={<TopicDrill />} />
                 <Route
                   path="/resume-interview"

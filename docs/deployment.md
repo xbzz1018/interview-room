@@ -13,7 +13,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-personal.ps1
 .\启动面试练习室.cmd
 ```
 
-产物位于 `dist/desktop-interview-room-themes/win-unpacked/`，保留完整目录。该入口的数据在 `local_tools/personal-data/`，不进入 Git。内部兼容标识和 exe 文件名保留，显示名称为面试练习室。
+产物位于 `dist/desktop-interview-room/win-unpacked/`，保留完整目录。该入口的数据在 `local_tools/personal-data/`，不进入 Git。内部兼容标识和 exe 文件名保留，显示名称为面试练习室。
 
 ### 开发运行
 
@@ -118,7 +118,7 @@ DB_PATH=data/interviews.db
 TECHSPAR_MODEL_CACHE_DIR=
 ```
 
-LLM、Embedding、DashScope、Tavily、OSS 和腾讯 VPR 凭据默认由每个用户登录后在“设置”中填写，不写入 `.env`。部署方若要提供共享兜底，只能使用 `.env.example` 中的 `PLATFORM_LLM_*`、`PLATFORM_EMBEDDING_*` 和调用额度配置。
+LLM 与 Embedding 凭据默认由每个用户登录后在“模型与设置”中填写，不写入 `.env`。文字模拟不需要语音、OSS 或声纹服务。部署方若要提供共享兜底，只能使用 `.env.example` 中的 `PLATFORM_LLM_*`、`PLATFORM_EMBEDDING_*` 和调用额度配置。
 
 首次启动会在用户表中创建 `DEFAULT_EMAIL`；以后修改 `DEFAULT_PASSWORD` 不会重置已经存在的账号密码。服务端启动会拒绝缺失、过短或仍为示例值的 JWT 密钥和默认密码。可用 `openssl rand -hex 32` 生成密钥；建议使用至少 32 个字符的独立 `VOICEPRINT_ENCRYPTION_KEY`。未配置声纹密钥时会沿用 JWT 密钥，以兼容已有加密数据。
 

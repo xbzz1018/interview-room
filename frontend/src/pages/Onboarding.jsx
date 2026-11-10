@@ -18,7 +18,7 @@ import LlmHeadersField from "../components/LlmHeadersField";
 import { parseLlmHeaders } from "../lib/llmHeaders";
 
 // 首登引导：每个用户都得带自己的 key,这里两步把 LLM + Embedding 配齐。
-// 其余可选服务(语音/搜索/录音上传)留到设置页按需填。
+// Text interviews need only a chat model and an embedding configuration.
 export default function Onboarding() {
   const { setNeedsOnboarding, logout } = useAuth();
   const navigate = useNavigate();
@@ -325,7 +325,7 @@ export default function Onboarding() {
         </Card>
 
         <div className="text-center text-[12px] text-dim/70 mt-4">
-          语音输入、联网搜索、录音复盘等可选功能的 key 可稍后在「设置 → 可选服务」里补。
+          配置文字模型和资料检索后即可开始面试，无需语音、视频或录音上传服务。
         </div>
       </div>
     </div>

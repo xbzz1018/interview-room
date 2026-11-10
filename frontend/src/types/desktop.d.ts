@@ -16,7 +16,6 @@ interface Window {
   techsparDesktop?: {
     getRuntimeInfo(): Promise<TechSparDesktopRuntimeInfo>
     bootstrapSession(): Promise<TechSparDesktopBootstrapSession>
-    openAudioSettings?(kind: 'microphone' | 'system'): Promise<void>
     getAppearanceTheme?(): Promise<'navy' | 'teal' | 'wine' | undefined>
     setAppearanceTheme?(theme: 'navy' | 'teal' | 'wine'): Promise<void>
   }

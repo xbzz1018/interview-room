@@ -3,16 +3,16 @@ param([switch]$CheckOnly)
 $ErrorActionPreference = 'Stop'
 
 $projectDir = Split-Path -Parent $PSScriptRoot
-$executable = Join-Path $projectDir 'dist\desktop-interview-room-themes\win-unpacked\TechSpar Personal.exe'
+$executable = Join-Path $projectDir 'dist\desktop-interview-room\win-unpacked\TechSpar Personal.exe'
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-    throw 'The current personal desktop build is missing: dist\desktop-interview-room-themes\win-unpacked. Run scripts\build-personal.ps1. Older builds are not launched automatically.'
+    throw 'The current personal desktop build is missing: dist\desktop-interview-room\win-unpacked. Run scripts\build-personal.ps1. Older builds are not launched automatically.'
 }
 
 # Keep this personal installation separate from the official desktop client.
 $personalData = Join-Path $projectDir 'local_tools\personal-data'
 if ($CheckOnly) {
     [pscustomobject]@{
-        Edition = 'interview-room-three-themes'
+        Edition = 'interview-room-text-practice'
         Executable = $executable
         BuiltAt = (Get-Item -LiteralPath $executable).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
         PersonalData = $personalData

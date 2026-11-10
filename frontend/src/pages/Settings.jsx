@@ -6,7 +6,6 @@ import {
   EyeOff,
   Loader2,
   Check,
-  Mic,
   Square,
   Trash2,
   Database,
@@ -16,7 +15,6 @@ import {
   Boxes,
   UserCog,
   RotateCw,
-  KeyRound,
   Plug,
   XCircle,
   Palette,
@@ -114,17 +112,8 @@ export default function Settings() {
   const [embLocalPath, setEmbLocalPath] = useState("");
   const [showEmbKey, setShowEmbKey] = useState(false);
 
-  // 可选服务密钥（每用户，对应功能开关）
-  const [dashscopeKey, setDashscopeKey] = useState("");
-  const [dashscopeWorkspace, setDashscopeWorkspace] = useState("");
-  const [tavilyKey, setTavilyKey] = useState("");
-  const [ossKeyId, setOssKeyId] = useState("");
-  const [ossKeySecret, setOssKeySecret] = useState("");
-  const [ossBucket, setOssBucket] = useState("");
-  const [ossEndpoint, setOssEndpoint] = useState("");
-  const [showDashscope, setShowDashscope] = useState(false);
-  const [showTavily, setShowTavily] = useState(false);
-  const [showOssSecret, setShowOssSecret] = useState(false);
+  // Preserve old credentials without exposing retired services.
+  const [legacyServices, setLegacyServices] = useState({});
 
   // 账户/系统配置（全局，仅 admin 可见）
   const [allowRegistration, setAllowRegistration] = useState(false);
@@ -153,7 +142,6 @@ export default function Settings() {
   const llmRef = useRef(null);
   const appearanceRef = useRef(null);
   const embeddingRef = useRef(null);
-  const servicesRef = useRef(null);
   const trainingRef = useRef(null);
   const accountRef = useRef(null);
   const migrationRef = useRef(null);
@@ -161,7 +149,6 @@ export default function Settings() {
     appearance: appearanceRef,
     llm: llmRef,
     embedding: embeddingRef,
-    services: servicesRef,
     training: trainingRef,
     account: accountRef,
     migration: migrationRef,
@@ -199,14 +186,7 @@ export default function Settings() {
         setEmbApiBatchSize(emb.api_batch_size ?? 10);
         setEmbLocalModel(emb.local_model || "");
         setEmbLocalPath(emb.local_path || "");
-        const svc = data.services || {};
-        setDashscopeKey(svc.dashscope_api_key || "");
-        setDashscopeWorkspace(svc.dashscope_workspace_id || "");
-        setTavilyKey(svc.tavily_api_key || "");
-        setOssKeyId(svc.oss_access_key_id || "");
-        setOssKeySecret(svc.oss_access_key_secret || "");
-        setOssBucket(svc.oss_bucket || "");
-        setOssEndpoint(svc.oss_endpoint || "");
+        setLegacyServices(data.services || {});
         setAllowRegistration(Boolean(data.system?.allow_registration));
         setIsAdmin(Boolean(data.is_admin));
         setLastReindexAt(data.last_reindex_at || "");
@@ -407,15 +387,7 @@ export default function Settings() {
           local_model: embLocalModel,
           local_path: embLocalPath,
         },
-        services: {
-          dashscope_api_key: dashscopeKey,
-          dashscope_workspace_id: dashscopeWorkspace.trim(),
-          tavily_api_key: tavilyKey,
-          oss_access_key_id: ossKeyId,
-          oss_access_key_secret: ossKeySecret,
-          oss_bucket: ossBucket,
-          oss_endpoint: ossEndpoint,
-        },
+        services: legacyServices,
         system: { allow_registration: allowRegistration },
         training: { num_questions: numQuestions, divergence },
       });
@@ -473,7 +445,6 @@ export default function Settings() {
     { id: "appearance", label: "外观配色", icon: Palette },
     { id: "llm", label: "LLM 服务", icon: Server },
     { id: "embedding", label: "Embedding", icon: Boxes },
-    { id: "services", label: "可选服务", icon: KeyRound },
     { id: "training", label: "训练参数", icon: Sliders },
     { id: "account", label: "账户", icon: UserCog },
     { id: "migration", label: "数据迁移", icon: Database },
@@ -884,111 +855,6 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Optional service keys (per-user; each gates one feature) */}
-        <Card ref={servicesRef} data-tab-id="services" className="overflow-hidden border-border/40 bg-card/40 scroll-mt-4">
-          <CardContent className="p-5 md:p-7">
-            <div className="flex items-center gap-2 mb-1">
-              <KeyRound size={16} className="text-primary" />
-              <span className="text-base font-semibold">可选服务密钥</span>
-            </div>
-            <div className="text-[13px] text-dim mb-6">
-              按需填写，各自启用对应功能；不填则该功能关闭。均为你的专属配置，仅对你生效。
-            </div>
-
-            <div className="space-y-6">
-              {/* DashScope */}
-              <div className="space-y-2">
-                <Label className={labelClass}>DashScope API Key</Label>
-                <div className="relative">
-                  <Input
-                    className={cn(inputClass, "pr-11")}
-                    masked={!showDashscope}
-                    placeholder="sk-...（语音输入 / 录音转写 / Copilot 实时识别）"
-                    value={dashscopeKey}
-                    onChange={(e) => setDashscopeKey(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-dim hover:text-text transition-colors"
-                    onClick={() => setShowDashscope((v) => !v)}
-                  >
-                    {showDashscope ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <div className="text-[12px] text-dim/70">阿里云百炼（DashScope）。不填则语音相关功能不可用。</div>
-                <Label className={labelClass}>百炼业务空间 ID（北京）</Label>
-                <Input className={inputClass} placeholder="llm-...（可选）" value={dashscopeWorkspace} onChange={(e) => setDashscopeWorkspace(e.target.value)} />
-                <div className="text-[12px] text-dim/70">Copilot 使用 Qwen-Audio-3.1-ASR 实时版。填写业务空间 ID 后使用该空间的专属接口；留空使用北京公共接口。</div>
-              </div>
-
-              {/* Tavily */}
-              <div className="space-y-2 border-t border-border/40 pt-5">
-                <Label className={labelClass}>Tavily API Key</Label>
-                <div className="relative">
-                  <Input
-                    className={cn(inputClass, "pr-11")}
-                    masked={!showTavily}
-                    placeholder="tvly-...（Copilot 联网搜索公司情报）"
-                    value={tavilyKey}
-                    onChange={(e) => setTavilyKey(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-dim hover:text-text transition-colors"
-                    onClick={() => setShowTavily((v) => !v)}
-                  >
-                    {showTavily ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <div className="text-[12px] text-dim/70">不填则 Copilot 跳过公司联网情报。</div>
-              </div>
-
-              {/* OSS */}
-              <div className="space-y-4 border-t border-border/40 pt-5">
-                <div>
-                  <div className="text-sm font-medium">阿里云 OSS（录音复盘长音频上传）</div>
-                  <div className="text-[12px] text-dim/70 mt-1">仅录音复盘上传长音频需要；答题短语音不需要。</div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label className={labelClass}>Access Key Id</Label>
-                    <Input className={inputClass} placeholder="LTAI..." value={ossKeyId} onChange={(e) => setOssKeyId(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className={labelClass}>Bucket</Label>
-                    <Input className={inputClass} placeholder="my-bucket" value={ossBucket} onChange={(e) => setOssBucket(e.target.value)} />
-                  </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label className={labelClass}>Access Key Secret</Label>
-                    <div className="relative">
-                      <Input
-                        className={cn(inputClass, "pr-11")}
-                        masked={!showOssSecret}
-                        placeholder="••••••"
-                        value={ossKeySecret}
-                        onChange={(e) => setOssKeySecret(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-dim hover:text-text transition-colors"
-                        onClick={() => setShowOssSecret((v) => !v)}
-                      >
-                        {showOssSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className={labelClass}>Endpoint</Label>
-                    <Input className={inputClass} placeholder="oss-cn-shanghai.aliyuncs.com" value={ossEndpoint} onChange={(e) => setOssEndpoint(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Training Params */}
         <Card ref={trainingRef} data-tab-id="training" className="overflow-hidden border-border/40 bg-card/40 scroll-mt-4">
           <CardContent className="p-5 md:p-7">
@@ -1160,7 +1026,7 @@ export default function Settings() {
                   <span>
                     <span className="block text-[13px] text-text">包含敏感凭据</span>
                     <span className="block text-[11px] leading-5 text-dim">
-                      包括 LLM / Embedding API Key、外部服务密钥和声纹凭据；默认不导出
+                      包括模型 API Key 及历史服务凭据；默认不导出
                     </span>
                   </span>
                 </label>
@@ -1296,8 +1162,8 @@ export default function Settings() {
             <p className="mt-2 text-[13px] leading-relaxed text-dim">围绕自己的简历和项目练习，保留问答与复盘，再用自己的话答一次。</p>
             <p className="mt-2 text-[12px] text-dim">个人维护：xbzz1018 · Interview Room</p>
             <details className="mt-4 text-[12px] leading-6 text-dim">
-              <summary className="cursor-pointer hover:text-text">开源来源与许可</summary>
-              <p className="mt-2">本项目由 <a href="https://github.com/AnnaSuSu/TechSpar" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">TechSpar</a> 改造，保留原作者署名，遵循 <a href="https://github.com/AnnaSuSu/TechSpar/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">GNU AGPL v3</a> 许可证。</p>
+              <summary className="cursor-pointer hover:text-text">开源许可</summary>
+              <p className="mt-2">源码由 xbzz1018 维护。<a href="https://github.com/xbzz1018/interview-room/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">项目许可</a> · <a href="https://github.com/xbzz1018/interview-room/blob/main/NOTICE.md" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">来源与第三方声明</a></p>
             </details>
           </CardContent>
         </Card>
@@ -1314,8 +1180,8 @@ export default function Settings() {
           ) : (
             <span className="text-[12px] text-dim/70">
               {isAdmin
-                ? "保存 LLM + Embedding + 服务密钥 + 训练参数 + 账户。数据迁移独立保存。"
-                : "保存 LLM + Embedding + 服务密钥 + 训练参数。数据迁移独立保存。"}
+                ? "保存模型、资料检索、训练参数和账户。数据迁移独立保存。"
+                : "保存模型、资料检索和训练参数。数据迁移独立保存。"}
             </span>
           )}
           <Button variant="gradient" className="px-8" onClick={handleSave} disabled={saving}>

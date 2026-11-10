@@ -15,18 +15,11 @@ import {
   DataMigrationService,
   QuotaService,
   ResumeService,
-  ShortTranscriptionService,
-  LongTranscriptionService,
-  RecordingService,
-  CopilotPrepService,
-  CopilotSessionService,
-  CopilotRealtimeService,
-  VoiceprintService,
   SettingsService,
   SettingsOperationsService,
   type PlatformProviderConfig,
 } from '@techspar/core'
-import { BunCopilotRepository, BunDataMigrationRepository, BunInterviewSessionRepository, BunKnowledgeVectorRepository, BunPersonalAgentRepository, BunResumeInterviewStateRepository, BunTaskRepository, BunUsageRepository, BunUserRepository } from '@techspar/db'
+import { BunDataMigrationRepository, BunInterviewSessionRepository, BunKnowledgeVectorRepository, BunPersonalAgentRepository, BunResumeInterviewStateRepository, BunTaskRepository, BunUsageRepository, BunUserRepository } from '@techspar/db'
 import {
   BcryptPasswordHasher,
   FileProviderSettingsRepository,
@@ -40,11 +33,9 @@ import {
   PortableDocumentTextExtractor,
   PortablePersonalDocumentExtractor,
   FileMigrationStore,
-  EncryptedFileVoiceprintRepository,
   TarGzipArchiveCodec,
 } from '@techspar/platform'
-import { DashScopeLongAsrDriver, QwenStreamingAsrFactory, DashScopeShortAsrDriver, OpenAiChatDriverFactory, OpenAiEmbeddingDriverFactory, TavilyWebSearchDriver, TencentVoiceprintDriverFactory } from '@techspar/providers'
-import { createBunWebSocket, type BunWebSocketData } from 'hono/bun'
+import { OpenAiChatDriverFactory, OpenAiEmbeddingDriverFactory } from '@techspar/providers'
 import { createApp } from './app.ts'
 import { loadExtensions } from './extensions.ts'
 import { withLongRequestTimeout } from './server-options.ts'
@@ -110,7 +101,6 @@ const resume = new ResumeService({
   extractor: new PortableDocumentTextExtractor(),
   index: { async invalidate(userId) { await vectorRepository.deleteChunks(userId, 'resume_chunk') } },
   ai,
-  transcription: new ShortTranscriptionService(settingsRepository, new DashScopeShortAsrDriver()),
 })
 const sessions = new BunInterviewSessionRepository(config.dbPath)
 sessions.initialize()
@@ -126,34 +116,18 @@ personalAgentRepository.initialize()
 const personalAgent = new PersonalAgentService({ repository: personalAgentRepository, files: new FilePersonalDocumentStore(config.dataDir), extractor: new PortablePersonalDocumentExtractor(), embeddings, ai, profile, ids: new ShortUuidGenerator() })
 const settingsOperations = new SettingsOperationsService({ chats: chatDrivers, embeddingDrivers, embeddings, index: knowledgeIndex, vectors: vectorRepository, knowledge: knowledgeStore, personal: personalAgent, profile, settings: settingsRepository })
 const interview = new InterviewService({ sessions, states: interviewStates, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, resume, knowledge: knowledgeIndex, knowledgeStore, settings: settingsRepository, profile, materials: personalAgent })
-const recording = new RecordingService({ sessions, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, profile, transcription: new LongTranscriptionService(settingsRepository, new DashScopeLongAsrDriver()) })
-const copilotRepository = new BunCopilotRepository(config.dbPath)
-copilotRepository.initialize()
-const voiceprint = new VoiceprintService(new EncryptedFileVoiceprintRepository(config.dataDir, config.voiceprintEncryptionKey), new TencentVoiceprintDriverFactory())
-const copilotAi = new AiService(settingsRepository, platform, quota, chatDrivers, config.copilotLlm)
-const copilotDependencies = { repository: copilotRepository, tasks: taskQueue, ids: new ShortUuidGenerator(), ai: copilotAi, embeddings, profile, resume, settings: settingsRepository, search: new TavilyWebSearchDriver(), asr: new QwenStreamingAsrFactory(), asrConfig: config.copilotAsr }
-const copilotPrep = new CopilotPrepService(copilotDependencies)
-const copilotSessions = new CopilotSessionService({ repository: copilotRepository, ids: new ShortUuidGenerator(), reviews: {
-  analyzeConversation: (context, input) => recording.analyzeConversation(context, input),
-  ensureSubmitted: (context, reviewId) => recording.recoverConversation(context, reviewId),
-  async status(context, reviewId) {
-    try { return (await interview.task(context, reviewId)).status }
-    catch (error) { if (error instanceof AppError && error.status === 404) return undefined; throw error }
-  },
-} })
-const copilotRealtime = new CopilotRealtimeService(copilotDependencies)
 const migration = new DataMigrationService({ codec: new TarGzipArchiveCodec(), database: new BunDataMigrationRepository(config.dbPath), files: new FileMigrationStore(config.dataDir, config.voiceprintEncryptionKey), profiles: profileRepository, users })
 taskQueue.register('resume_review', (task) => interview.runReviewTask(task))
 taskQueue.register('drill_review', (task) => interview.runReviewTask(task))
 taskQueue.register('jd_review', (task) => interview.runReviewTask(task))
-taskQueue.register('copilot_review', (task) => recording.runAnalysisTask(task))
-taskQueue.register('recording_review', (task) => recording.runAnalysisTask(task))
-taskQueue.register('copilot_prep', (task) => copilotPrep.runPrepTask(task))
 taskQueue.register('retrospective', (task) => profile.runRetrospectiveTask(task))
+// Retired tasks end explicitly instead of contacting old media providers.
+for (const type of ['copilot_review', 'recording_review', 'copilot_prep']) taskQueue.register(type, async () => {
+  throw new AppError('该功能已停用；已保存的历史记录仍可查看。', 410, 'feature_retired')
+})
 await taskQueue.start()
-const { upgradeWebSocket, websocket } = createBunWebSocket()
-const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotSessions, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
+const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
 
-const server = Bun.serve<BunWebSocketData>(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server), websocket }))
+const server = Bun.serve(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server) }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { void server.stop(true).finally(() => process.exit(0)) })

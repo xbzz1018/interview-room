@@ -6,7 +6,7 @@ const root = process.cwd();
 const prior = JSON.parse(await readFile(join(root, 'local_tools/desktop-validation.json'), 'utf8'));
 const qaDir = resolve(prior.qaDir || '');
 if (!/^ui-qa-\d+$/.test(relative(join(root, 'local_tools'), qaDir)) || !prior.workflowChecks?.threeThemes) throw new Error('Run the isolated personal desktop workflow first.');
-const executable = join(root, 'dist/desktop-interview-room-themes/win-unpacked/TechSpar Personal.exe');
+const executable = join(root, 'dist/desktop-interview-room/win-unpacked/TechSpar Personal.exe');
 const env = { ...process.env, TECHSPAR_DESKTOP_USER_DATA_DIR:qaDir, ALLOW_REGISTRATION:'false' };
 for (const key of Object.keys(env)) {
   if (['TECHSPAR_EXTENSIONS', 'TECHSPAR_RENDERER_URL', 'ELECTRON_RUN_AS_NODE', 'DEFAULT_EMAIL', 'DEFAULT_PASSWORD', 'JWT_SECRET', 'VOICEPRINT_ENCRYPTION_KEY'].includes(key) || key.startsWith('PLATFORM_') || key.startsWith('COPILOT_')) delete env[key];

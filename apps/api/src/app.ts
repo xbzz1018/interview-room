@@ -50,6 +50,8 @@ export type AppDependencies = {
   tokens: TokenService
   knowledge: KnowledgeUseCases
   resume: ResumeUseCases
+  /** Only legacy contract harnesses enable the retired short-audio endpoint. */
+  legacyTranscription?: boolean
   interview?: InterviewUseCases
   profile?: ProfileUseCases
   personalAgent?: PersonalAgentUseCases

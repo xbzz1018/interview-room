@@ -29,6 +29,7 @@ export function boundaryApp(overrides: Partial<AppDependencies> = {}): ReturnTyp
     tokens: testTokens,
     knowledge: unavailable,
     resume: unavailable,
+    legacyTranscription: true,
     ...overrides,
   } as unknown as AppDependencies)
 }

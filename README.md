@@ -31,14 +31,14 @@
 
 ![三套主题](images/appearance-themes.png)
 
-主要入口是面试、复盘、资料、简历、专项和能力记录；录音、知识库、图谱与 Copilot 放在更多工具中。
+主要入口是面试、复盘、资料、简历、专项、能力记录和备面知识库。
 
 ## 技术栈
 
 | 层次 | 技术与职责 |
 | --- | --- |
 | 界面 | React、TypeScript、Vite、Tailwind；表单、问答流与训练记录 |
-| API | Hono、Bun；REST/SSE/WebSocket 与契约校验 |
+| API | Hono、Bun；REST/SSE 与契约校验 |
 | 业务 | TypeScript 用例、状态机和端口；材料、面试、复盘与重答规则 |
 | 数据 | SQLite、文件存储；会话、资料版本与可重建向量 |
 | 模型 | OpenAI 兼容/Responses；本地 ONNX 或外部 Embedding |
@@ -55,7 +55,7 @@ bun run dev:desktop
 
 首次进入填写自己的模型基础地址、模型 ID 和 API Key，支持 Chat Completions 与 Responses 网关。无需固定厂商或固定模型。
 
-本地 Embedding 用于资料检索和长期记忆，简历模拟读取所选材料全文；首次使用本地向量需要下载模型。文字 API 不能代替语音等可选服务。见 [设置](docs/settings.md) 与 [外部服务](docs/external-services.md)。
+本地 Embedding 用于资料检索和长期记忆，简历模拟读取所选材料全文；首次使用本地向量需要下载模型。文字模拟无需音视频服务。见 [设置](docs/settings.md) 与 [外部服务](docs/external-services.md)。
 
 Windows 个人包：
 
@@ -63,7 +63,11 @@ Windows 个人包：
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-personal.ps1
 ```
 
-构建后运行 `启动面试练习室.cmd`。程序在 `dist/desktop-interview-room-themes/win-unpacked/`，个人数据在 `local_tools/personal-data/`，均不进入 Git。完整程序目录需要一起保留。当前尚未发布个人版安装包。
+构建后运行 `启动面试练习室.cmd`。程序在 `dist/desktop-interview-room/win-unpacked/`，个人数据在 `local_tools/personal-data/`，均不进入 Git。完整程序目录需要一起保留。当前尚未发布个人版安装包。
+
+## 功能范围
+
+只保留文字模拟面试、简历/JD 与项目资料、专项练习、复盘、参考答法、重答和能力记录。录音复盘、实时语音辅助、音视频采集及知识图谱页面已移除；无需语音或录音上传服务。历史数据保留，原有记录可查看。
 
 ## 验证
 
@@ -84,7 +88,7 @@ bun run smoke:personal-desktop
 - 未完整生成的报告重启后需要重新生成，重答尚未作为可恢复后台任务运行。
 - 资料旧版本暂留，无版本回滚界面。每轮最多 8 份资料库文档、48000 字，连同默认简历最多 60000 字。
 - 模型可能给出错误建议；未知职责和数字应标为待补充，参考解法不能代替真实经历。
-- 固定场景质量评估、检索回归和部分语音/跨平台实测仍待完成。
+- 固定场景质量评估、检索回归和跨平台实测仍待完成。
 
 见 [项目案例](docs/project-case.md)、[架构与选型](docs/typescript-backend-architecture.md)、[改进计划](docs/project-roadmap.md) 和 [个人产品实施计划](docs/personal-project-plan.md)。
 

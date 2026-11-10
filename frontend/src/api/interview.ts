@@ -10,21 +10,6 @@ import {
 // 兼容旧引用:authFetch 历史上从本模块导出
 export { authFetch } from "./client";
 
-// ── Speech-to-text ──
-
-export async function transcribeAudio(
-  audioBlob: Blob
-): Promise<ApiResponse<"/api/transcribe", "post">> {
-  const form = new FormData();
-  form.append("file", audioBlob, "recording.webm");
-  const res = await authFetch(`${API_BASE}/transcribe`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) throw new Error(await responseErrorText(res));
-  return res.json();
-}
-
 export async function getTopics(): Promise<ApiResponse<"/api/topics", "get">> {
   const res = await authFetch(`${API_BASE}/topics`);
   if (!res.ok) throw new Error(await responseErrorText(res));
@@ -344,16 +329,6 @@ export async function getInterviewTopics(): Promise<
   return res.json();
 }
 
-// ── Graph ──
-
-export async function getGraphData(
-  topic: string
-): Promise<ApiResponse<"/api/graph/{topic}", "get">> {
-  const res = await authFetch(`${API_BASE}/graph/${topic}`);
-  if (!res.ok) throw new Error(await responseErrorText(res));
-  return res.json();
-}
-
 // ── Profile & Retrospective ──
 
 export async function getProfile(): Promise<ApiResponse<"/api/profile", "get">> {
@@ -496,52 +471,6 @@ export async function generateKnowledge(
       method: "POST",
     }
   );
-  if (!res.ok) throw new Error(await responseErrorText(res));
-  return res.json();
-}
-
-// ── Recording review ──
-
-export async function transcribeRecording(
-  audioBlob: Blob & { name?: string },
-  mode: NonNullable<
-    ApiRequestBody<
-      "/api/recording/transcribe",
-      "post",
-      "multipart/form-data"
-    >["mode"]
-  > = "dual"
-): Promise<ApiResponse<"/api/recording/transcribe", "post">> {
-  const form = new FormData();
-  form.append("file", audioBlob, audioBlob.name || "recording.webm");
-  form.append("mode", mode);
-  const res = await authFetch(`${API_BASE}/recording/transcribe`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) throw new Error(await responseErrorText(res));
-  return res.json();
-}
-
-export async function analyzeRecording(
-  transcript: ApiRequestBody<"/api/recording/analyze", "post">["transcript"],
-  recordingMode: NonNullable<
-    ApiRequestBody<"/api/recording/analyze", "post">["recording_mode"]
-  >,
-  company?: ApiRequestBody<"/api/recording/analyze", "post">["company"],
-  position?: ApiRequestBody<"/api/recording/analyze", "post">["position"]
-): Promise<ApiResponse<"/api/recording/analyze", "post">> {
-  const body: ApiRequestBody<"/api/recording/analyze", "post"> = {
-    transcript,
-    recording_mode: recordingMode,
-  };
-  if (company) body.company = company;
-  if (position) body.position = position;
-  const res = await authFetch(`${API_BASE}/recording/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
   if (!res.ok) throw new Error(await responseErrorText(res));
   return res.json();
 }

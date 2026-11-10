@@ -53,7 +53,7 @@ const gateway = createServer(async (request, response) => {
 });
 await new Promise(resolve => gateway.listen(0, '127.0.0.1', resolve));
 const gatewayBase = `http://127.0.0.1:${gateway.address().port}/v1`;
-const interviewBuild = join(root, 'dist', 'desktop-interview-room-themes', 'win-unpacked', 'TechSpar Personal.exe');
+const interviewBuild = join(root, 'dist', 'desktop-interview-room', 'win-unpacked', 'TechSpar Personal.exe');
 const executable = resolve(process.env.TECHSPAR_SMOKE_DESKTOP || (existsSync(interviewBuild) ? interviewBuild : join(root, 'dist', 'desktop-personal', 'win-unpacked', 'TechSpar Personal.exe')));
 const env = { ...process.env, TECHSPAR_DESKTOP_USER_DATA_DIR: qaDir, ALLOW_REGISTRATION: 'false' };
 for (const key of Object.keys(env)) {
@@ -189,9 +189,7 @@ try {
     await until(`location.pathname === '/mock-interview' && document.body?.innerText.includes('开始一轮面试')`);
     if (await evaluate('document.title') !== '面试练习室') throw new Error('Personal product title was not packaged');
     await evaluate(`location.href='/'`);
-    await until(`location.pathname === '/mock-interview' && location.search === '?mode=live' && document.querySelector('nav[aria-label="主要导航"] button[aria-label="更多工具"]')`);
-    await evaluate(`document.querySelector('nav[aria-label="主要导航"] button[aria-label="更多工具"]').click()`);
-    await until(`document.getElementById('desktop-more-tools') && !document.getElementById('desktop-more-tools').hidden`);
+    await until(`location.pathname === '/mock-interview' && location.search === '?mode=live' && document.querySelector('nav[aria-label="主要导航"] a[href="/knowledge"]')`);
     await evaluate(`document.querySelector('nav[aria-label="主要导航"] a[href="/knowledge"]').click()`);
     await until(`location.pathname === '/knowledge' && document.body?.innerText.includes('核心知识库')`);
     if (await evaluate(`document.querySelector('nav[aria-label="主要导航"] a[href="/knowledge"]').getAttribute('aria-current')`) !== 'page') throw new Error('Secondary navigation lost its active page');
@@ -332,8 +330,8 @@ try {
       await writeFile(join(qaDir,`theme-${theme}-settings.png`),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
     }
     await evaluate(`window.techsparDesktop.setAppearanceTheme('invalid').then(()=>{throw new Error('Invalid theme was accepted')},()=>{})`);
-    await evaluate(`[...document.querySelectorAll('details summary')].find(summary=>summary.innerText.trim()==='开源来源与许可').click()`);
-    await until(`[...document.querySelectorAll('details')].some(details=>details.open && details.innerText.includes('GNU AGPL v3') && details.innerText.includes('TechSpar'))`);
+    await evaluate(`[...document.querySelectorAll('details summary')].find(summary=>summary.innerText.trim()==='开源许可').click()`);
+    await until(`[...document.querySelectorAll('details')].some(details=>details.open && details.innerText.includes('来源与第三方声明') && Boolean(details.querySelector('a[href$="/NOTICE.md"]')))`);
     await evaluate(`[...document.querySelectorAll('[data-tab-id="llm"] button')].find(button=>button.innerText.trim()==='测试连接').click()`);
     await until(`document.querySelector('[data-tab-id="llm"]').innerText.includes('连接正常')`);
     await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='保存').click()`);
@@ -350,7 +348,16 @@ try {
     await writeFile(join(qaDir,'personal-welcome.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await evaluate(`document.querySelector('a[href="/login"]').click()`);
     await until(`location.pathname === '/mock-interview' && document.body?.innerText.includes('开始一轮面试')`);
-    const final = { ...result, workflowChecks: {personalHome:true,personalWelcome:true,contextualNavigation:true,secondaryNavigation:true,collapsedNavigation:true,mobileNavigation:true,pdfResumePage:true,startButton:true,streamingChat:true,reloadTranscript:true,history:true,resumeReview:true,resumeReferenceAnswer:true,cachedReferenceAfterReload:true,knowledgePage:true,personalAgentPage:true,settingsPage:true,documentEditing:true,selectedMaterials:true,coachingMode:true,retryComparison:true,cachedComparisonAfterReload:true,practiceProgress:true,restartMaterialSelection:true,personalApiTestAndSave:true,commercialUiRemoved:true,sourceNoticePreserved:true,threeThemes:true,themePersistence:true,themeDraftPreserved:true,themeAcrossRoutes:true,settingsThemePicker:true,themeIpcValidation:true}, gatewayRequests, qaDir };
+    if (await evaluate(`Boolean(document.querySelector('nav a[href="/recording"],nav a[href="/copilot"],nav a[href="/graph"],[data-tab-id="services"]'))`)) throw new Error('Retired feature entry remains');
+    await evaluate(`(async()=>{
+      const token=JSON.parse(localStorage.getItem('techspar-session')).token;
+      for(const path of ['/api/transcribe','/api/recording/transcribe','/api/recording/analyze','/api/copilot/prep','/api/voiceprint/status']){
+        const response=await fetch(path,{method:path.endsWith('/status')?'GET':'POST',headers:{Authorization:'Bearer '+token}});
+        if(response.status!==404)throw new Error('Retired route remains: '+path);
+      }
+      if(window.techsparDesktop.openAudioSettings)throw new Error('Audio IPC remains');
+    })()`);
+    const final = { ...result, workflowChecks: {personalHome:true,personalWelcome:true,contextualNavigation:true,knowledgeNavigation:true,collapsedNavigation:true,mobileNavigation:true,pdfResumePage:true,startButton:true,streamingChat:true,reloadTranscript:true,history:true,resumeReview:true,resumeReferenceAnswer:true,cachedReferenceAfterReload:true,knowledgePage:true,personalAgentPage:true,settingsPage:true,documentEditing:true,selectedMaterials:true,coachingMode:true,retryComparison:true,cachedComparisonAfterReload:true,practiceProgress:true,restartMaterialSelection:true,personalApiTestAndSave:true,commercialUiRemoved:true,textOnlyScope:true,retiredApiAbsent:true,audioIpcRemoved:true,sourceNoticePreserved:true,threeThemes:true,themePersistence:true,themeDraftPreserved:true,themeAcrossRoutes:true,settingsThemePicker:true,themeIpcValidation:true}, gatewayRequests, qaDir };
     await writeFile(join(qaDir,'result.json'),JSON.stringify(final,null,2));
     await writeFile(join(root,'local_tools','desktop-validation.json'),JSON.stringify(final,null,2));
     console.log(JSON.stringify({stage:'workflow-ui-passed',checks:final.workflowChecks,qaDir}));

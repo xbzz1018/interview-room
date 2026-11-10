@@ -13,7 +13,7 @@ import { authenticatedContext } from '../http/context.ts'
 
 export function registerResumeRoutes(
   app: OpenAPIHono,
-  deps: { resume: ResumeUseCases; tokens: TokenService },
+  deps: { resume: ResumeUseCases; tokens: TokenService; legacyTranscription?: boolean },
 ): void {
   app.openapi(createRoute({ method: 'get', path: '/api/resume/status', responses: { 200: { content: { 'application/json': { schema: ResumeStatusSchema } }, description: 'Resume status' } } }),
     async (c) => c.json(await deps.resume.status(await authenticatedContext(c, deps.tokens))))
@@ -33,6 +33,7 @@ export function registerResumeRoutes(
   app.openapi(createRoute({ method: 'post', path: '/api/resume/upload', request: { body: { content: { 'multipart/form-data': { schema: ResumeUploadSchema } } } }, responses: { 200: { content: { 'application/json': { schema: ResumeUploadedSchema } }, description: 'Uploaded resume' } } }),
     async (c) => { const file = c.req.valid('form').file; return c.json(await deps.resume.upload(await authenticatedContext(c, deps.tokens), file.name, new Uint8Array(await file.arrayBuffer()))) })
 
+  if (!deps.legacyTranscription) return
   app.openapi(createRoute({ method: 'post', path: '/api/transcribe', request: { body: { content: { 'multipart/form-data': { schema: ResumeUploadSchema } } } }, responses: { 200: { content: { 'application/json': { schema: TranscriptionSchema } }, description: 'Transcribed audio' } } }),
     async (c) => { const file = c.req.valid('form').file; return c.json(await deps.resume.transcribe(await authenticatedContext(c, deps.tokens), file.name || 'audio.webm', new Uint8Array(await file.arrayBuffer()))) })
 }

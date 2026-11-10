@@ -71,3 +71,17 @@ test('review displays a partial report, background sync and an isolated retry, t
   expect(document.body.textContent).toContain('选择本轮材料');
   expect(requests.every(url => url === '/api/interview/review/qa')).toBeTrue();
 });
+
+test('retired media reviews show saved text without regeneration or model calls', async () => {
+  const calls: string[] = [];
+  globalThis.fetch = (async (input) => {
+    calls.push(String(input));
+    return new Response(JSON.stringify({ mode: 'recording', status: 'review_failed', review: '# 历史报告正文', questions: [], scores: [], transcript: [{ role: 'user', content: '历史回答原文' }], overall: {}, meta: { profile_extract_failed: true, profile_sync_pending: true } }));
+  }) as typeof fetch;
+  await mount(<AuthContext.Provider value={{ user: null, token: 'test-token', loading: false, verificationError: null, retryVerification() {}, needsOnboarding: false, setNeedsOnboarding() {}, login() {}, logout() {} }}><Routes><Route path="/review/:sessionId" element={<Review />} /></Routes></AuthContext.Provider>, '/review/legacy');
+  expect(document.body.textContent).toContain('历史报告正文');
+  expect(document.body.textContent).toContain('历史回答原文');
+  expect(document.body.textContent).toContain('仅展示已保存内容');
+  expect([...document.querySelectorAll('button')].some(button => /重试|再次练习|参考答法/.test(button.textContent || ''))).toBe(false);
+  expect(calls).toHaveLength(1);
+});

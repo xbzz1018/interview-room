@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Check, Minus, Star } from "lucide-react";
@@ -6,7 +6,6 @@ import ChatBubble from "../components/ChatBubble";
 import { sendMessageStream, endInterview, retryReview, getResumableSession, saveDraftAnswers } from "../api/interview";
 import { readSession } from "../lib/authSession";
 import useTaskStatus from "../hooks/useTaskStatus";
-import useVoiceInput from "../hooks/useVoiceInput";
 import { buildInterviewAnswers } from "../lib/interviewAnswers";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,28 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function Interview() {
   const { sessionId } = useParams();
   return <InterviewSession key={sessionId} />;
-}
-
-function MicButton({ voice }) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
-        voice.isListening ? "bg-red text-white animate-pulse-dot" : voice.isTranscribing ? "bg-orange text-white animate-pulse-dot" : "bg-hover text-dim hover:text-text"
-      )}
-      onClick={voice.toggle}
-      disabled={voice.isTranscribing}
-      title={voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-    </button>
-  );
 }
 
 function InterviewSession() {
@@ -85,13 +62,6 @@ function InterviewSession() {
   const [selfAssess, setSelfAssess] = useState(() => localStorage.getItem("drill-self-assess") !== "off");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const drillVoice = useVoiceInput({
-    onResult: useCallback((text) => setDrillInput((prev) => prev + text), []),
-  });
-  const chatVoice = useVoiceInput({
-    onResult: useCallback((text) => setInput((prev) => prev + text), []),
-  });
 
   useEffect(() => {
     let cancelled = false;
@@ -561,18 +531,13 @@ function InterviewSession() {
                 <div className="flex-1 relative">
                   <textarea
                     ref={textareaRef}
-                    className="w-full min-h-[80px] max-h-[240px] px-4 py-3 rounded-xl border border-border bg-input text-text resize-none text-sm leading-relaxed pr-12 placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
+                    className="w-full min-h-[80px] max-h-[240px] px-4 py-3 rounded-xl border border-border bg-input text-text resize-none text-sm leading-relaxed placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
                     value={drillInput}
                     onChange={(e) => setDrillInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={drillVoice.isListening ? "正在录音..." : drillVoice.isTranscribing ? "正在识别语音..." : "输入你的回答... (Enter 提交)"}
+                    placeholder="输入你的回答... (Enter 提交)"
                     rows={3}
                   />
-                  {drillVoice.isSupported && (
-                    <div className="absolute bottom-3 right-3">
-                      <MicButton voice={drillVoice} />
-                    </div>
-                  )}
                 </div>
                 <div className="flex items-center justify-end gap-3">
                   {isDrill && (selfAssess ? (
@@ -729,22 +694,17 @@ function InterviewSession() {
           <div className="relative w-full max-w-3xl">
             <textarea
               ref={textareaRef}
-              className="w-full px-4 py-4 md:px-5 pr-12 min-h-[80px] max-h-[240px] rounded-2xl border border-border bg-card text-text resize-none text-[15px] leading-normal placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
+              className="w-full px-4 py-4 md:px-5 min-h-[80px] max-h-[240px] rounded-2xl border border-border bg-card text-text resize-none text-[15px] leading-normal placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
               value={input}
               onChange={(e) => {
                 setInput(e.target.value);
                 try { if (draftKey) sessionStorage.setItem(draftKey, e.target.value); } catch { /* Storage is optional. */ }
               }}
               onKeyDown={handleKeyDown}
-              placeholder={chatVoice.isListening ? "正在录音..." : finished ? "面试已结束" : "输入你的回答... (Enter 发送)"}
+              placeholder={finished ? "面试已结束" : "输入你的回答... (Enter 发送)"}
               disabled={finished || sending || Boolean(pendingAnswer)}
               rows={3}
             />
-            {chatVoice.isSupported && !finished && (
-              <div className="absolute bottom-4 right-3">
-                <MicButton voice={chatVoice} />
-              </div>
-            )}
           </div>
         </div>
     </div>

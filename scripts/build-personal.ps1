@@ -21,7 +21,7 @@ if ($CheckOnly) {
     [pscustomobject]@{
         Project = $projectDir
         Bun = $portableBun
-        Output = Join-Path $projectDir 'dist\desktop-interview-room-themes\win-unpacked'
+        Output = Join-Path $projectDir 'dist\desktop-interview-room\win-unpacked'
     } | Format-List
     return
 }

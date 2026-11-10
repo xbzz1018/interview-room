@@ -8,7 +8,7 @@
 - [简历模拟、材料与模式](resume-mock.md)
 - [如何使用复盘与重答](training-results.md)
 - [岗位备面](jd-preparation.md)
-- [可选语音及搜索服务](external-services.md)
+- [模型与资料检索配置](external-services.md)
 - [合成项目材料](../examples/project-brief.md) 与 [合成 JD](../examples/job-description.md)
 
 ## 实现与计划

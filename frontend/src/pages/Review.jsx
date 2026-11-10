@@ -97,7 +97,7 @@ function PointList({ title, items, tone = "red" }) {
   );
 }
 
-function SoloRecordingReview({ topicsCovered, overall }) {
+function ArchivedReview({ topicsCovered, overall }) {
   const avgScore = overall?.avg_score || "-";
   return (
     <>
@@ -648,7 +648,7 @@ function ReviewSession() {
         setReportStatus(data.status);
         setReportError(data.review_error || '');
         setAnswers(inferAnswers(data.questions || [], data.transcript || []));
-        if (data.status === 'reviewing' || data.meta?.profile_sync_pending) timer = window.setTimeout(load, 1500);
+        if (!['recording', 'copilot'].includes(data.mode) && (data.status === 'reviewing' || data.meta?.profile_sync_pending)) timer = window.setTimeout(load, 1500);
       } catch (error) { if (!cancelled) { setReportError(error.message || '读取报告失败'); timer = window.setTimeout(load, 3000); } }
       finally { if (!cancelled) setLoading(false); }
     };
@@ -683,11 +683,9 @@ function ReviewSession() {
   const isCopilot = currentMode === "copilot";
   const isRecording = currentMode === "recording";
   const isJobPrep = currentMode === "jd_prep";
-  const isRecordingDual = isRecording && (
-    stateData.recording_mode === "dual" || meta?.recording_mode === "dual" || questions.length > 0
-  );
-  const showDrill = currentMode === "topic_drill" || isRecordingDual || isCopilot;
-  const title = isCopilot ? "Copilot 实战复盘" : isRecording ? "录音复盘" : isJobPrep ? "JD 备面复盘" : showDrill ? "训练复盘" : "面试复盘";
+  const showDrill = currentMode === "topic_drill";
+  const archived = isCopilot || isRecording;
+  const title = isCopilot ? "历史辅助记录" : isRecording ? "历史导入记录" : isJobPrep ? "JD 备面复盘" : showDrill ? "训练复盘" : "面试复盘";
 
   return (
     <div className="flex-1 px-4 py-8 md:px-6 md:py-10 max-w-3xl mx-auto w-full">
@@ -701,7 +699,8 @@ function ReviewSession() {
         <div className="text-sm text-dim">Session: {sessionId}</div>
       </div>
 
-      {(currentMode === 'resume' || reportError) && <section aria-label="复盘进度" className="mb-5 rounded-xl border border-border bg-card p-4 text-sm">
+      {archived && <p className="mb-5 rounded-xl border border-border bg-card p-4 text-sm text-dim">这是已停用功能的历史记录，仅展示已保存内容。新的练习请从“开始面试”进入。</p>}
+      {!archived && (currentMode === 'resume' || reportError) && <section aria-label="复盘进度" className="mb-5 rounded-xl border border-border bg-card p-4 text-sm">
         <p className="font-medium">{meta.review_stage === 'generating' ? (review ? '正在生成报告，内容会逐段保存…' : '模型正在分析，等待报告首段…') : meta.profile_sync_pending ? '报告已保存，可先阅读；画像正在后台同步…' : meta.profile_extract_failed ? '报告已保存，画像同步失败，可单独重试' : reportStatus === 'review_failed' ? '报告生成中断，已保存的内容仍可查看' : reportStatus === 'reviewed' ? '报告已完成' : '正在读取复盘状态'}</p>
         {meta.training_mode === 'coach' && <p className="mt-1 text-xs text-dim">本轮为教练练习，受帮助的回答不计入严格模拟分数趋势。</p>}
         {Array.isArray(meta.selected_materials) && meta.selected_materials.length > 0 && <p className="mt-1 text-xs text-dim">本轮材料快照：{meta.selected_materials.map((item) => `${item.filename}（${item.role}）`).join('、')}</p>}
@@ -711,8 +710,17 @@ function ReviewSession() {
       </section>}
 
       <div className="stagger-children">
-        {isRecording && !isRecordingDual ? (
-          <SoloRecordingReview topicsCovered={topicsCovered} overall={overall} />
+        {archived ? (
+          <>
+            <ArchivedReview topicsCovered={topicsCovered} overall={overall} />
+            <Card className="mb-6"><CardContent className="p-5 md:p-8 md-content">
+              <ReactMarkdown>{review || "此历史记录没有已保存的报告正文。"}</ReactMarkdown>
+            </CardContent></Card>
+            {messages.length > 0 && <Card><CardContent className="p-5">
+              <h2 className="mb-3 font-semibold">已保存的问答</h2>
+              {messages.map((message, index) => <p key={index} className="mb-3 whitespace-pre-wrap text-sm leading-7"><strong>{message.role === "user" ? "你" : "面试官"}：</strong>{message.content}</p>)}
+            </CardContent></Card>}
+          </>
         ) : isJobPrep ? (
           <JobPrepReview scores={scores} overall={overall} questions={questions} answers={answers} meta={meta} />
         ) : showDrill ? (

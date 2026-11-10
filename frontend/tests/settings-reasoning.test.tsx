@@ -23,7 +23,7 @@ let probeError = "";
 let delayProbes = false;
 const pendingProbes: Array<{ resolve: (response: Response) => void; reject: (error: Error) => void }> = [];
 const probes: Array<Record<string, unknown>> = [];
-const saves: Array<{ llm: Record<string, unknown> }> = [];
+const saves: Array<{ llm: Record<string, unknown>; services?: Record<string, unknown> }> = [];
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { "content-type": "application/json" } });
 
 beforeEach(() => {
@@ -42,6 +42,7 @@ beforeEach(() => {
     }
     if (String(url) === "/api/settings") return json({
       llm: { api_base: "https://provider.test/v1", api_key: "synthetic", model: "test-model", compatibility: "generic", reasoning_effort: savedEffort, temperature: 0.7, http_headers: savedHeaders },
+      services: { dashscope_api_key: "synthetic-legacy-key", tavily_api_key: "synthetic-old-search", oss_bucket: "synthetic-bucket" },
       training: { num_questions: 10, divergence: 3 }, platform: { llm: platform }, source: platform ? "platform" : "user",
     });
     throw new Error(`Unexpected request: ${url}`);
@@ -211,4 +212,12 @@ test("Responses exposes xhigh and saves gateway headers with the selected protoc
   expect(probes[0]).toMatchObject(expected);
   await click(button("保存"));
   expect(saves[0]?.llm).toMatchObject(expected);
+});
+
+test('saving text interview settings preserves historical service credentials without showing their controls', async () => {
+  await mount();
+  expect(document.querySelector('[data-tab-id="services"]')).toBeNull();
+  expect([...document.querySelectorAll('label')].some(label => /DashScope|Tavily|OSS/.test(label.textContent || ''))).toBe(false);
+  await click(button('保存'));
+  expect(saves.at(-1)?.services).toEqual({ dashscope_api_key: 'synthetic-legacy-key', tavily_api_key: 'synthetic-old-search', oss_bucket: 'synthetic-bucket' });
 });

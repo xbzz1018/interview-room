@@ -18,8 +18,8 @@ const MODE_BADGES = {
   resume: { text: "简历面试", variant: "default" },
   topic_drill: { text: "专项训练", variant: "success" },
   jd_prep: { text: "JD 备面", variant: "blue" },
-  copilot: { text: "Copilot 实战", variant: "default" },
-  recording: { text: "录音复盘", variant: "blue" },
+  copilot: { text: "历史辅助记录", variant: "default" },
+  recording: { text: "历史导入记录", variant: "blue" },
 };
 
 const FILTER_OPTIONS = [
@@ -27,13 +27,12 @@ const FILTER_OPTIONS = [
   { key: "resume", label: "简历面试" },
   { key: "topic_drill", label: "专项训练" },
   { key: "jd_prep", label: "JD 备面" },
-  { key: "copilot", label: "Copilot 实战" },
-  { key: "recording", label: "录音复盘" },
 ];
 
 // Session lifecycle → UI affordances. Ongoing sessions with no review yet are
 // shown distinctly from review-failed ones so users can take the right action.
 const STATUS_META = {
+  archived: { label: "历史记录", tone: "info", icon: CalendarDays },
   prepared: { label: "待开始训练", tone: "info", icon: Play },
   reviewed: { label: "已复盘", tone: "success", icon: CircleCheck },
   reviewing: { label: "复盘生成中", tone: "info", icon: LoaderCircle, spin: true },
@@ -123,7 +122,8 @@ export default function History() {
   // Status dictates where a row click goes. Reviewed → /review. Anything else
   // routes back into /interview so the user can continue answering or retry review.
   const openSession = (session) => {
-    if (session.status === "prepared") navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(session.session_id)}`);
+    if (["recording", "copilot"].includes(session.mode)) navigate("/review/" + session.session_id);
+    else if (session.status === "prepared") navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(session.session_id)}`);
     else if (session.status === "reviewed") navigate(`/review/${session.session_id}`);
     else navigate(`/interview/${session.session_id}`);
   };
@@ -417,10 +417,11 @@ function HistoryRow({ session, onOpen, onDelete, onRetry, retrying }) {
   const subtitle = session.meta?.company || "";
   const createdDate = session.created_at?.slice(0, 10);
   const compactSessionId = formatSessionId(session.session_id);
-  const status = session.status || "reviewed";
+  const archived = ["recording", "copilot"].includes(session.mode);
+  const status = archived ? "archived" : session.status || "reviewed";
   // 复盘成功但画像提取失败的场次也允许补跑(后端 regenerate 端点对这种场次放行)
   const extractFailed = Boolean(session.meta?.profile_extract_failed);
-  const canRetry = status === "review_failed" || extractFailed;
+  const canRetry = !archived && (status === "review_failed" || extractFailed);
 
   return (
     <Card
@@ -480,7 +481,7 @@ function HistoryRow({ session, onOpen, onDelete, onRetry, retrying }) {
               </div>
             )}
 
-            {status !== "review_failed" && extractFailed && (
+            {!archived && status !== "review_failed" && extractFailed && (
               <div className="mt-2 text-[12px] leading-5 text-orange/90">
                 复盘已保存，但画像或记忆同步未完成——点右侧“重试同步”可补跑未完成步骤。
               </div>

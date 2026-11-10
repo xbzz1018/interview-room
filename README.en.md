@@ -28,7 +28,7 @@ bun install --frozen-lockfile
 bun run dev:desktop
 ```
 
-Configure your own model base URL, model ID, API key and Chat Completions or Responses protocol in settings. Local ONNX or an external embedding service supports retrieval; optional speech services need their own configuration.
+Configure your own model base URL, model ID, API key and Chat Completions or Responses protocol in settings. Local ONNX or an external embedding service supports retrieval; text interviews do not require speech, recording or camera services. Historical media sessions remain available as saved records.
 
 For a Windows personal build:
 

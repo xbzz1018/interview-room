@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
-  User, BookOpen, GitFork, Clock, Mic, Brain,
+  User, BookOpen, Clock,
   Target, FileUser, Settings as SettingsIcon,
-  LogOut, Menu, X, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, MessagesSquare,
+  LogOut, Menu, X, ChevronLeft, ChevronRight, FolderOpen, MessagesSquare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import useAuth from "../hooks/useAuth";
@@ -34,13 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: "/resume-manager", label: "我的简历", icon: FileUser },
   { path: "/topic-drill", label: "专项练习", icon: Target },
   { path: "/profile", label: "能力记录", icon: User },
-];
-
-const MORE_ITEMS: NavItem[] = [
-  { path: "/knowledge", label: "知识库", icon: BookOpen },
-  { path: "/recording", label: "录音复盘", icon: Mic },
-  { path: "/copilot", label: "面试 Copilot", icon: Brain },
-  { path: "/graph", label: "知识图谱", icon: GitFork },
+  { path: "/knowledge", label: "备面知识库", icon: BookOpen },
 ];
 
 export default function Sidebar() {
@@ -49,10 +43,7 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
-  const [toolsOverride, setToolsOverride] = useState<{ path: string; open: boolean } | null>(null);
   const open = openPath === location.pathname;
-  const toolRoute = MORE_ITEMS.some(({ path }) => location.pathname.startsWith(path));
-  const toolsExpanded = toolsOverride?.path === location.pathname ? toolsOverride.open : toolRoute;
 
   useEffect(() => { localStorage.setItem("sidebar-collapsed", String(collapsed)); }, [collapsed]);
 
@@ -107,7 +98,6 @@ export default function Sidebar() {
 
   const sidebar = (mobile = false) => {
     const compact = collapsed && !mobile;
-    const toolsId = mobile ? "mobile-more-tools" : "desktop-more-tools";
     return (
     <aside className={cn(
       "flex flex-col h-full border-r border-sidebar-border bg-sidebar transition-all duration-300",
@@ -124,22 +114,6 @@ export default function Sidebar() {
       <TooltipProvider delayDuration={0}>
         <nav aria-label={mobile ? "移动导航" : "主要导航"} className={cn("flex-1 flex flex-col gap-1 overflow-y-auto py-3", compact ? "px-2" : "px-3")}>
           {NAV_ITEMS.map((item) => navItem(item, compact))}
-          <div className="mt-3 border-t border-sidebar-border pt-2">
-            <button
-              type="button"
-              aria-label="更多工具"
-              aria-expanded={toolsExpanded}
-              aria-controls={toolsId}
-              onClick={() => setToolsOverride({ path: location.pathname, open: !toolsExpanded })}
-              className={cn("flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-dim hover:bg-hover hover:text-text", compact && "justify-center px-0")}
-            >
-              <ChevronDown size={18} className={cn("shrink-0 transition-transform", !toolsExpanded && "-rotate-90")} />
-              {!compact && <span>更多工具</span>}
-            </button>
-            <div id={toolsId} hidden={!toolsExpanded} className="space-y-0.5">
-              {MORE_ITEMS.map((item) => navItem(item, compact))}
-            </div>
-          </div>
           <div className="mt-auto pt-3">{navItem({ path: "/settings", label: "模型与设置", icon: SettingsIcon }, compact)}</div>
         </nav>
 

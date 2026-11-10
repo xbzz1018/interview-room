@@ -21,7 +21,7 @@ const MIME_TYPES: Record<string, string> = {
 
 const SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy': "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' https: wss:; worker-src 'self' blob:",
-  'Permissions-Policy': 'camera=(), geolocation=(), microphone=(self)',
+  'Permissions-Policy': 'camera=(), geolocation=(), microphone=(), display-capture=()',
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',

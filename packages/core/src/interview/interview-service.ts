@@ -636,7 +636,8 @@ export class InterviewService implements InterviewUseCases {
   async review(context: RequestContext, sessionId: string): Promise<InterviewSession> {
     const session = await this.deps.sessions.get(sessionId, userId(context))
     if (!session) throw new AppError('Session not found.', 404)
-    if (!session.review && !['reviewing', 'review_failed'].includes(session.status)) throw new AppError('Interview not yet reviewed.', 400)
+    const archived = session.mode === 'recording' || session.mode === 'copilot'
+    if (!archived && !session.review && !['reviewing', 'review_failed'].includes(session.status)) throw new AppError('Interview not yet reviewed.', 400)
     return session.mode === 'resume' ? { ...session, review: session.review || String(session.meta.review_draft || ''), questions: resumeQuestions(session) } : session
   }
 

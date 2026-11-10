@@ -32,10 +32,6 @@ extraResources:
     filter:
       - "**/*"
 mac:
-  extendInfo:
-    NSMicrophoneUsageDescription: 面试练习室 使用麦克风转写你的回答。
-    NSAudioCaptureUsageDescription: 面试练习室 使用系统音频转写会议中对方的发言。
-    NSScreenCaptureUsageDescription: 面试练习室 通过系统共享接口获取会议音频，不上传屏幕画面。
   category: public.app-category.education
   icon: build/icon.png
   target:

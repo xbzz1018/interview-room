@@ -130,6 +130,7 @@ export class ResumeService implements ResumeUseCases {
   }
 
   async transcribe(context: RequestContext, filename: string, bytes: Uint8Array) {
+    if (!this.deps.transcription) throw new AppError('语音输入已停用，请使用文字作答。', 410, 'feature_retired')
     if (!bytes.length) throw new AppError('Empty audio file.', 400)
     const index = filename.lastIndexOf('.')
     const suffix = index >= 0 ? filename.slice(index) : '.webm'
