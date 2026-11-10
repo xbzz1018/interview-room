@@ -3,7 +3,8 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Check, Minus, Star } from "lucide-react";
 import ChatBubble from "../components/ChatBubble";
-import { sendMessage, sendMessageStream, endInterview, retryReview, getResumableSession, saveDraftAnswers } from "../api/interview";
+import { sendMessageStream, endInterview, retryReview, getResumableSession, saveDraftAnswers } from "../api/interview";
+import { readSession } from "../lib/authSession";
 import useTaskStatus from "../hooks/useTaskStatus";
 import useVoiceInput from "../hooks/useVoiceInput";
 import { buildInterviewAnswers } from "../lib/interviewAnswers";
@@ -15,31 +16,67 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Interview() {
   const { sessionId } = useParams();
+  return <InterviewSession key={sessionId} />;
+}
+
+function MicButton({ voice }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
+        voice.isListening ? "bg-red text-white animate-pulse-dot" : voice.isTranscribing ? "bg-orange text-white animate-pulse-dot" : "bg-hover text-dim hover:text-text"
+      )}
+      onClick={voice.toggle}
+      disabled={voice.isTranscribing}
+      title={voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+  );
+}
+
+function InterviewSession() {
+  const { sessionId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { tasks, startTask } = useTaskStatus();
   const chatEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const mountedRef = useRef(false);
+  const sendingRef = useRef(false);
+  const activeSessionRef = useRef(sessionId);
+  activeSessionRef.current = sessionId;
+  const accountId = readSession()?.user.id;
+  const draftKey = accountId ? `interview-draft:${encodeURIComponent(accountId)}:${encodeURIComponent(sessionId)}` : null;
 
-  // Session bootstrap: populate either from router state (fresh start) or by
-  // fetching /interview/session/:id/resume (opened via history).
-  const [initData, setInitData] = useState(() => location.state || null);
+  // Browser history retains router state across refreshes. Always load the
+  // saved session so its transcript, drafts and lifecycle stay authoritative.
+  const [initData, setInitData] = useState(null);
   const [bootstrapError, setBootstrapError] = useState("");
-  const [sessionStatus, setSessionStatus] = useState(location.state?.status || null);
-  const [resumeError, setResumeError] = useState(location.state?.review_error || "");
+  const [sessionStatus, setSessionStatus] = useState(null);
+  const [resumeError, setResumeError] = useState("");
 
   const isBatchMode = initData?.mode === "topic_drill" || initData?.mode === "jd_prep";
   const isJobPrep = initData?.mode === "jd_prep";
   const isDrill = initData?.mode === "topic_drill";
 
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => {
+    try { return draftKey ? sessionStorage.getItem(draftKey) || "" : ""; } catch { return ""; }
+  });
   const [sending, setSending] = useState(false);
   const [finished, setFinished] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [turnError, setTurnError] = useState("");
   const [progress] = useState(location.state?.progress || "");
 
-  const [questions, setQuestions] = useState(location.state?.questions || []);
+  const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [drillInput, setDrillInput] = useState("");
@@ -57,17 +94,9 @@ export default function Interview() {
   });
 
   useEffect(() => {
-    // Fresh start from a landing page → location.state carries everything.
-    const routeState = location.state;
-    if (routeState) {
-      const routeIsBatch = routeState.mode === "topic_drill" || routeState.mode === "jd_prep";
-      if (!routeIsBatch && routeState.message) {
-        setMessages([{ role: "assistant", content: routeState.message }]);
-      }
-      return;
-    }
-    // Resume-from-history: rebuild from server state.
     let cancelled = false;
+    mountedRef.current = true;
+    sendingRef.current = false;
     (async () => {
       try {
         const data = await getResumableSession(sessionId);
@@ -112,7 +141,9 @@ export default function Interview() {
           } else {
             // Resume at the first still-unanswered question instead of restarting at Q1.
             const firstUnanswered = (data.questions || []).findIndex((q) => !saved[q.id]);
-            if (firstUnanswered > 0) setCurrentIndex(firstUnanswered);
+            const restoredIndex = Math.max(0, firstUnanswered);
+            setCurrentIndex(restoredIndex);
+            setDrillInput(saved[data.questions?.[restoredIndex]?.id] || "");
           }
         }
         // If a review is already in flight server-side, subscribe to its status
@@ -128,8 +159,31 @@ export default function Interview() {
         if (!cancelled) setBootstrapError(err.message || "无法加载面试");
       }
     })();
-    return () => { cancelled = true; };
-  }, [location.state, sessionId, startTask, navigate]);
+    return () => { cancelled = true; mountedRef.current = false; };
+  }, [sessionId, draftKey, startTask, navigate]);
+
+  // A stream may finish after navigation unmounted its original view. Resume
+  // from the durable transcript; never submit the answer again while polling.
+  const pendingAnswer = messages.at(-1)?.role === "user" ? messages.at(-1).content : "";
+  useEffect(() => {
+    if (!initData || isBatchMode || finished || sending || !pendingAnswer) return;
+    let cancelled = false;
+    let polling = false;
+    const timer = window.setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const data = await getResumableSession(sessionId);
+        if (cancelled || sendingRef.current) return;
+        setMessages(data.transcript || []);
+        setSessionStatus(data.status);
+        if (!data.can_continue || data.is_finished || data.status !== "ongoing") setFinished(true);
+        if (data.transcript?.at(-1)?.role === "assistant") setTurnError("");
+      } catch { /* Keep the saved answer visible during temporary disconnection. */ }
+      finally { polling = false; }
+    }, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [initData, isBatchMode, finished, sending, pendingAnswer, sessionId]);
 
   useEffect(() => {
     if (!isBatchMode) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -143,13 +197,10 @@ export default function Interview() {
   const totalQ = questions.length;
   const answeredCount = Object.keys(answers).length;
 
-  // Mirror the saved answer into the textarea whenever the active question changes,
-  // so paging back to review and forward again shows each answer instead of a blank
-  // box. Keyed only on the index — never re-runs while typing.
-  useEffect(() => {
-    if (isBatchMode) setDrillInput(answers[currentQ?.id] || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, isBatchMode]);
+  const goToQuestion = (index, savedAnswers = answers) => {
+    setCurrentIndex(index);
+    setDrillInput(savedAnswers[questions[index]?.id] || "");
+  };
 
   // Best-effort autosave: persist answered questions so the session survives a
   // refresh/navigation. Fire-and-forget — a failed draft must not block answering.
@@ -169,7 +220,7 @@ export default function Interview() {
     persistDraft(nextAnswers);
     // The index-change effect resets the textarea to the next answer; on the last
     // question we stay put and hand off to the finished view.
-    if (currentIndex < totalQ - 1) setCurrentIndex((i) => i + 1);
+    if (currentIndex < totalQ - 1) goToQuestion(currentIndex + 1, nextAnswers);
     else setFinished(true);
   };
 
@@ -182,13 +233,13 @@ export default function Interview() {
 
   const handleSkip = () => {
     if (!currentQ) return;
-    if (currentIndex < totalQ - 1) setCurrentIndex((i) => i + 1);
+    if (currentIndex < totalQ - 1) goToQuestion(currentIndex + 1);
     else setFinished(true);
   };
 
   const handlePrev = () => {
     if (currentIndex <= 0) return;
-    setCurrentIndex((i) => i - 1);
+    goToQuestion(currentIndex - 1);
   };
 
   const handleEndBatch = async () => {
@@ -215,19 +266,26 @@ export default function Interview() {
     }
   };
 
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+  const handleSend = async (retryText) => {
+    const text = (typeof retryText === "string" ? retryText : input).trim();
+    if (!text || sendingRef.current || finished) return;
+    sendingRef.current = true;
+    const previousMessageCount = messages.length;
+    const current = () => mountedRef.current && activeSessionRef.current === sessionId;
+    setMessages((prev) => prev.at(-1)?.role === "user" && prev.at(-1).content === text ? prev : [...prev, { role: "user", content: text }]);
     setInput("");
+    try { if (draftKey) sessionStorage.removeItem(draftKey); } catch { /* Storage is optional. */ }
     setSending(true);
+    setTurnError("");
 
     // Insert empty assistant message for streaming
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
+    let streamError;
     try {
       await sendMessageStream(sessionId, text, {
         onToken: (token) => {
+          if (!current()) return;
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
@@ -236,38 +294,40 @@ export default function Interview() {
           });
         },
         onDone: (data) => {
+          if (!current()) return;
           // Interview ended on its own (max rounds) — kick off review immediately
           // so the user never lands on a finished chat with no review running.
           if (data.is_finished) finishAndReview();
         },
         onError: (err) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[updated.length - 1] = { role: "assistant", content: `[错误] ${err.message}` };
-            return updated;
-          });
+          streamError = err;
         },
       });
-    } catch {
-      // SSE failed — fallback to non-streaming
+      if (streamError) throw streamError;
+    } catch (err) {
+      if (!current()) return;
+      setTurnError(err.message || "回复未完成，请重新加载或重试上一条回答。");
+      // A failed response does not prove the server rejected the answer. Read
+      // saved state first; automatic POST fallback could duplicate the turn.
       try {
-        const data = await sendMessage(sessionId, text);
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: "assistant", content: data.message };
-          return updated;
-        });
-        if (data.is_finished) finishAndReview();
-      } catch (err) {
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: "assistant", content: `[错误] ${err.message}` };
-          return updated;
-        });
+        const data = await getResumableSession(sessionId);
+        if (!current()) return;
+        setMessages(data.transcript || []);
+        setSessionStatus(data.status);
+        if ((data.transcript?.length || 0) <= previousMessageCount && data.transcript?.at(-1)?.role !== 'user') {
+          setInput(text);
+          try { if (draftKey) sessionStorage.setItem(draftKey, text); } catch { /* Storage is optional. */ }
+        }
+        if (!data.can_continue || data.is_finished || data.status !== "ongoing") setFinished(true);
+      } catch {
+        if (current()) setMessages((prev) => prev.at(-1)?.role === "assistant" ? prev.slice(0, -1) : prev);
       }
     } finally {
-      setSending(false);
-      textareaRef.current?.focus();
+      if (current()) {
+        sendingRef.current = false;
+        setSending(false);
+        textareaRef.current?.focus();
+      }
     }
   };
 
@@ -277,6 +337,7 @@ export default function Interview() {
     setSessionStatus("reviewing");
     setResumeError("");
     startTask(sessionId, "resume_review", "简历面试复盘生成中");
+    navigate(`/review/${sessionId}`);
   };
 
   const handleEndResume = async () => {
@@ -329,27 +390,7 @@ export default function Interview() {
     ? { text: "JD 备面", variant: "blue" }
     : initData?.mode === "topic_drill"
       ? { text: "专项训练", variant: "success" }
-      : { text: "简历面试", variant: "default" };
-
-  const MicButton = ({ voice }) => (
-    <button
-      type="button"
-      className={cn(
-        "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
-        voice.isListening ? "bg-red text-white animate-pulse-dot" : voice.isTranscribing ? "bg-orange text-white animate-pulse-dot" : "bg-hover text-dim hover:text-text"
-      )}
-      onClick={voice.toggle}
-      disabled={voice.isTranscribing}
-      title={voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-    </button>
-  );
+      : { text: initData?.meta?.training_mode === "coach" ? "教练练习" : "严格模拟", variant: "default" };
 
   // Bootstrap gate: show a skeleton while the resume payload is in flight, or
   // an error view if the session doesn't exist / can't be loaded.
@@ -632,8 +673,8 @@ export default function Interview() {
             handler = handleRetryResumeReview;
             label = reviewing ? "重新生成中..." : "重新生成复盘";
           } else if (reviewInFlight) {
-            handler = undefined;
-            label = "复盘生成中...";
+            handler = () => navigate(`/review/${sessionId}`);
+            label = "查看生成进度";
           } else if (!finished) {
             handler = handleEndResume;
             label = reviewing ? "生成复盘中..." : "结束面试";
@@ -646,7 +687,7 @@ export default function Interview() {
               variant="destructive"
               size="sm"
               onClick={handler}
-              disabled={reviewing || (!handler && !taskDone)}
+              disabled={sending || reviewing || (!handler && !taskDone)}
             >
               {label}
             </Button>
@@ -665,6 +706,14 @@ export default function Interview() {
         {messages.map((msg, i) => (
           <ChatBubble key={i} role={msg.role} content={msg.content} />
         ))}
+        {!sending && pendingAnswer && !finished && (
+          <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm leading-6" role="status">
+            <p>上一条回答已保留，正在检查面试官的回复。</p>
+            <p className="text-dim">{turnError || "切换页面后会自动加载已保存的后续问答；若回复中断，可重试上一条回答。"}</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => handleSend(pendingAnswer)}>重试上一条回答</Button>
+          </div>
+        )}
+        {turnError && !pendingAnswer && <div role="alert" className="text-sm text-red">{turnError}</div>}
         {sending && messages.length > 0 && messages[messages.length - 1].role === "assistant" && !messages[messages.length - 1].content && (
           <div className="flex items-center gap-2 animate-fade-in opacity-75 -mt-4">
             <div className="w-5 h-5 flex items-center justify-center shrink-0">
@@ -682,10 +731,13 @@ export default function Interview() {
               ref={textareaRef}
               className="w-full px-4 py-4 md:px-5 pr-12 min-h-[80px] max-h-[240px] rounded-2xl border border-border bg-card text-text resize-none text-[15px] leading-normal placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                try { if (draftKey) sessionStorage.setItem(draftKey, e.target.value); } catch { /* Storage is optional. */ }
+              }}
               onKeyDown={handleKeyDown}
               placeholder={chatVoice.isListening ? "正在录音..." : finished ? "面试已结束" : "输入你的回答... (Enter 发送)"}
-              disabled={finished || sending}
+              disabled={finished || sending || Boolean(pendingAnswer)}
               rows={3}
             />
             {chatVoice.isSupported && !finished && (

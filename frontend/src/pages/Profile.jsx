@@ -119,7 +119,7 @@ export default function Profile() {
 
     return (
       <div className={PAGE_CLASS}>
-        <div className="text-3xl font-display font-bold">个人画像</div>
+        <div className="text-3xl font-display font-bold">能力记录</div>
         <Card className="mt-5 overflow-hidden border-primary/20 bg-[linear-gradient(135deg,rgba(245,158,11,0.12),rgba(20,184,166,0.08))] dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(8,145,178,0.12))]">
           <CardContent className="p-8 md:p-10">
             <div className="max-w-2xl">
@@ -221,7 +221,7 @@ export default function Profile() {
   return (
     <div className={PAGE_CLASS}>
       <div className="animate-fade-in">
-        <div className="text-3xl font-display font-bold tracking-tight md:text-4xl">个人画像</div>
+        <div className="text-3xl font-display font-bold tracking-tight md:text-4xl">能力记录</div>
         <div className="mt-2 text-sm text-dim">
           {profile.target_role ? `目标岗位 ${profile.target_role} · ` : ""}
           共 {stats.total_sessions || 0} 场练习 · 分析了 {stats.total_answers || 0} 个回答

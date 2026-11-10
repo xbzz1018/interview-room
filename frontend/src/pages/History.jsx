@@ -206,9 +206,9 @@ export default function History() {
       <div className={PAGE_CLASS}>
         <div className="flex flex-col gap-2.5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
-            <div className="text-3xl font-display font-bold tracking-tight md:text-[38px]">历史记录</div>
+            <div className="text-3xl font-display font-bold tracking-tight md:text-[38px]">复盘与重练</div>
             <div className="mt-1 max-w-2xl text-sm leading-6 text-dim">
-              按模式和领域快速回看训练记录，重点保留时间和评分这两类核心信息。
+              继续未完成的面试，或打开复盘学习参考答法、再次作答。
             </div>
           </div>
 
@@ -314,11 +314,11 @@ export default function History() {
                 <p className="mt-2 text-sm leading-6 text-dim">
                   {hasFilters
                     ? "调整模式或领域筛选后，再试一次。"
-                    : "开始一场新的模拟面试后，这里会沉淀你的时间线和评分变化。"}
+                    : "完成一轮模拟面试后，回来查看问答、参考答法和重答练习。"}
                 </p>
                 {!hasFilters && (
-                  <Button variant="gradient" className="mt-5" onClick={() => navigate("/")}>
-                    去首页开始面试
+                  <Button variant="gradient" className="mt-5" onClick={() => navigate("/mock-interview?mode=live")}>
+                    开始第一轮面试
                   </Button>
                 )}
               </div>

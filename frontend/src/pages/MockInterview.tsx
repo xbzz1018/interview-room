@@ -1,5 +1,5 @@
 import { useRef, type KeyboardEvent } from "react";
-import { ArrowRight, BriefcaseBusiness, FileText, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, MessageCircle, Sparkles } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import JobPrep from "./JobPrep";
@@ -13,7 +13,7 @@ const MODES = [
     icon: MessageCircle,
     title: "实时模拟",
     shortTitle: "实时模拟",
-    requirement: "简历必选 · JD 选填",
+    requirement: "简历或项目资料 · JD 选填",
     description: "AI 面试官根据回答动态追问，适合完整演练一轮真实面试。",
   },
   {
@@ -55,24 +55,25 @@ export default function MockInterview() {
   return (
     <div className="flex-1 w-full">
       <div className="mx-auto w-full max-w-[1180px] px-4 pt-6 md:px-7 md:pt-8 xl:px-8">
-        <header className="flex items-start gap-3.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm shadow-primary/5">
-            <FileText size={21} />
-          </div>
-          <div className="min-w-0">
+        <header className="flex flex-wrap items-start gap-3.5">
+          <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/70">
-              面试工作台
+              个人模拟面试
             </div>
-            <h1 className="mt-0.5 text-2xl font-display font-bold tracking-tight text-text md:text-[30px]">
-              面试训练
+            <h1 className="personal-page-title mt-1.5 text-2xl font-display font-semibold tracking-tight text-text md:text-[30px]">
+              开始一轮面试
             </h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-dim">
-              准备本次面试资料，选择更适合当前目标的训练方式。
+              围绕自己的经历练追问，复盘后用自己的话再答一次。
             </p>
           </div>
+          <nav aria-label="训练流程快捷入口" className="flex w-full flex-wrap gap-2 sm:w-auto sm:pt-1">
+            <Link to="/personal-agent" className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-dim transition-colors hover:border-primary/40 hover:text-primary">准备资料</Link>
+            <Link to="/history" className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-dim transition-colors hover:border-primary/40 hover:text-primary">复盘与重练</Link>
+          </nav>
         </header>
 
-        <div className="mt-5 rounded-2xl border border-border/75 bg-card/65 p-1.5 shadow-sm">
+        <div className="mt-5 border-b border-border pb-1">
           <div
             role="tablist"
             aria-label="面试训练方式"
@@ -94,9 +95,9 @@ export default function MockInterview() {
                   onClick={() => selectMode(mode.key)}
                   onKeyDown={(event) => handleTabKeyDown(event, index)}
                   className={cn(
-                    "group flex min-h-14 items-center justify-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 md:justify-start md:px-4",
+                    "group flex min-h-14 items-center justify-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 md:justify-start md:px-4",
                     active
-                      ? "bg-background text-text shadow-sm ring-1 ring-border/70"
+                      ? "bg-primary/7 text-primary"
                       : "text-dim hover:bg-background/45 hover:text-text"
                   )}
                 >

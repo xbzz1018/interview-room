@@ -2,13 +2,14 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { BookOpen, BriefcaseBusiness, Sparkles, RotateCcw } from "lucide-react";
-import { getReview, getReferenceAnswer, startInterview, startJobPrep } from "../api/interview";
+import { getReview, getReferenceAnswer, startInterview, startJobPrep, retryReview } from "../api/interview";
 import useAuth from "../hooks/useAuth";
 import { jobPrepDraftKey } from "../lib/jobPrepAccount";
 import { jobPrepRestartRequest, clearJobPrepRestart } from "../lib/jobPrepRestart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { RetryAnswer } from '@/components/InterviewPractice';
 
 function getScoreColor(score) {
   if (score >= 8) return { bg: "rgba(34,197,94,0.15)", color: "var(--success)" };
@@ -493,13 +494,73 @@ function JobPrepReview({ scores, overall, questions, answers, meta }) {
 function inferAnswers(questions, transcript) {
   if (!questions?.length || !transcript?.length) return [];
   return questions.map((q) => {
-    const qIdx = transcript.findIndex((m) => m.role === "assistant" && m.content === q.question);
+    const turn = /^resume-turn-(\d+)$/.exec(String(q.id));
+    const qIdx = turn ? Number(turn[1]) - 1 : transcript.findIndex((m) => m.role === "assistant" && m.content === q.question);
     const next = qIdx >= 0 ? transcript[qIdx + 1] : null;
     return { question_id: q.id, answer: next?.role === "user" ? next.content : "" };
   });
 }
 
+export function ResumeReferenceAnswers({ sessionId, questions, transcript, initialAnswers, attempts = [] }) {
+  const [references, setReferences] = useState(initialAnswers || {});
+  const [loading, setLoading] = useState({});
+  const [errors, setErrors] = useState({});
+  const active = useRef(new Set());
+  const answers = inferAnswers(questions, transcript);
+
+  const generate = async (id) => {
+    if (references[id] || active.current.has(id)) return;
+    active.current.add(id);
+    setLoading((previous) => ({ ...previous, [id]: true }));
+    setErrors((previous) => ({ ...previous, [id]: "" }));
+    try {
+      const data = await getReferenceAnswer(sessionId, id);
+      setReferences((previous) => ({ ...previous, [id]: data.reference_answer }));
+    } catch (error) {
+      setErrors((previous) => ({ ...previous, [id]: error.message || "生成失败，请重试。" }));
+    } finally {
+      active.current.delete(id);
+      setLoading((previous) => ({ ...previous, [id]: false }));
+    }
+  };
+
+  if (!questions?.length) return null;
+  return (
+    <section className="mb-6" aria-label="逐题参考答法">
+      <h2 className="text-base font-semibold mb-2">逐题参考答法</h2>
+      <p className="mb-4 text-sm leading-6 text-dim">结合这轮问答和简历生成回答框架、口述示例与后续追问。按需生成并保存；项目细节需要以你的真实经历核实。</p>
+      <div className="flex flex-col gap-4">
+        {questions.map((question, index) => (
+          <Card key={question.id}>
+            <CardContent className="p-4 md:p-6">
+              <div className="text-[15px] font-medium leading-relaxed mb-3">{index + 1}. {question.question}</div>
+              <div className="rounded-lg bg-hover px-3 py-3 text-sm leading-relaxed whitespace-pre-wrap mb-3">
+                <div className="text-xs text-dim mb-1">你的回答</div>
+                {answers.find(answer => String(answer.question_id) === String(question.id))?.answer || "未作答"}
+              </div>
+              {references[question.id] ? (
+                <div className="md-content text-sm leading-[1.8]"><ReactMarkdown>{references[question.id]}</ReactMarkdown></div>
+              ) : (
+                <Button variant="outline" size="sm" disabled={loading[question.id]} onClick={() => generate(question.id)}>
+                  <BookOpen size={13} />{loading[question.id] ? "正在生成参考答法…" : errors[question.id] ? "重试生成参考答法" : "生成参考答法"}
+                </Button>
+              )}
+              {errors[question.id] && <p role="alert" className="mt-2 text-sm text-red">{errors[question.id]}</p>}
+              {references[question.id] && <RetryAnswer key={`${sessionId}:${question.id}`} sessionId={sessionId} questionId={question.id} attempts={attempts.filter((item) => item.question_id === String(question.id))} />}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Review() {
+  const { sessionId } = useParams();
+  return <ReviewSession key={sessionId} />;
+}
+
+function ReviewSession() {
   const { sessionId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -520,6 +581,10 @@ export default function Review() {
   const [showTranscript, setShowTranscript] = useState(false);
   const [loading, setLoading] = useState(!review && !scores);
   const [restarting, setRestarting] = useState(false);
+  const [reportStatus, setReportStatus] = useState('');
+  const [reportError, setReportError] = useState('');
+  const [retryingReport, setRetryingReport] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   const { token } = useAuth();
   const restartOperation = useRef(null);
   const restartBusy = useRef(false);
@@ -528,6 +593,7 @@ export default function Review() {
   const handleRestart = async () => {
     const currentMode = mode || stateData.mode;
     if (!currentMode || (currentMode === "recording" || currentMode === "copilot") || restartBusy.current) return;
+    if (currentMode === "resume") { navigate('/mock-interview?mode=live'); return; }
     restartBusy.current = true;
     setRestarting(true);
     try {
@@ -564,38 +630,39 @@ export default function Review() {
   };
 
   useEffect(() => {
-    if (!review && !scores) {
-      getReview(sessionId)
-        .then((data) => {
-          setReview(data.review);
-          if (data.scores) setScores(data.scores);
-          if (data.questions) setQuestions(data.questions);
-          if (data.transcript) setMessages(data.transcript);
-          if (data.mode) setMode(data.mode);
-          if (data.topic) setTopic(data.topic);
-          if (data.overall && Object.keys(data.overall).length) {
-            setOverall(data.overall);
-          } else if (data.weak_points) {
-            const wp = Array.isArray(data.weak_points) ? data.weak_points : [];
-            if (wp.length) setOverall((prev) => ({ ...prev, new_weak_points: wp }));
-          }
-          const tc = data.topics_covered || data.overall?.topics_covered;
-          if (tc) setTopicsCovered(tc);
-          if (data.meta) setMeta(data.meta);
-          if (data.reference_answers) setReferenceAnswers(data.reference_answers);
-          if (
-            data.mode === "topic_drill"
-            || data.mode === "jd_prep"
-            || data.mode === "copilot"
-            || (data.mode === "recording" && data.meta?.recording_mode === "dual")
-          ) {
-            setAnswers(inferAnswers(data.questions || [], data.transcript || []));
-          }
-        })
-        .catch((err) => setReview("加载失败: " + err.message))
-        .finally(() => setLoading(false));
-    }
-  }, [sessionId, review, scores]);
+    let cancelled = false; let timer;
+    const load = async () => {
+      try {
+        const data = await getReview(sessionId);
+        if (cancelled) return;
+        setReview(data.review || '');
+        setScores(data.scores || []);
+        setQuestions(data.questions || []);
+        setMessages(data.transcript || []);
+        setMode(data.mode);
+        setTopic(data.topic);
+        setOverall(data.overall || {});
+        setTopicsCovered(data.overall?.topics_covered || []);
+        setMeta(data.meta || {});
+        setReferenceAnswers(data.reference_answers || {});
+        setReportStatus(data.status);
+        setReportError(data.review_error || '');
+        setAnswers(inferAnswers(data.questions || [], data.transcript || []));
+        if (data.status === 'reviewing' || data.meta?.profile_sync_pending) timer = window.setTimeout(load, 1500);
+      } catch (error) { if (!cancelled) { setReportError(error.message || '读取报告失败'); timer = window.setTimeout(load, 3000); } }
+      finally { if (!cancelled) setLoading(false); }
+    };
+    void load();
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [sessionId, reloadCount]);
+
+  const retryReport = async () => {
+    if (retryingReport) return;
+    setRetryingReport(true);
+    try { await retryReview(sessionId); setReloadCount((value) => value + 1); }
+    catch (error) { setReportError(error.message); }
+    finally { setRetryingReport(false); }
+  };
 
   if (loading) {
     return (
@@ -634,6 +701,15 @@ export default function Review() {
         <div className="text-sm text-dim">Session: {sessionId}</div>
       </div>
 
+      {(currentMode === 'resume' || reportError) && <section aria-label="复盘进度" className="mb-5 rounded-xl border border-border bg-card p-4 text-sm">
+        <p className="font-medium">{meta.review_stage === 'generating' ? (review ? '正在生成报告，内容会逐段保存…' : '模型正在分析，等待报告首段…') : meta.profile_sync_pending ? '报告已保存，可先阅读；画像正在后台同步…' : meta.profile_extract_failed ? '报告已保存，画像同步失败，可单独重试' : reportStatus === 'review_failed' ? '报告生成中断，已保存的内容仍可查看' : reportStatus === 'reviewed' ? '报告已完成' : '正在读取复盘状态'}</p>
+        {meta.training_mode === 'coach' && <p className="mt-1 text-xs text-dim">本轮为教练练习，受帮助的回答不计入严格模拟分数趋势。</p>}
+        {Array.isArray(meta.selected_materials) && meta.selected_materials.length > 0 && <p className="mt-1 text-xs text-dim">本轮材料快照：{meta.selected_materials.map((item) => `${item.filename}（${item.role}）`).join('、')}</p>}
+        {meta.review_first_token_at && meta.review_started_at && <p className="mt-1 text-xs text-dim">报告首次内容：{Math.max(0, (Date.parse(meta.review_first_token_at) - Date.parse(meta.review_started_at)) / 1000).toFixed(1)} 秒{meta.review_report_ready_at ? ` · 正文完成：${Math.max(0, (Date.parse(meta.review_report_ready_at) - Date.parse(meta.review_started_at)) / 1000).toFixed(1)} 秒` : ''}</p>}
+        {reportError && <p role="alert" className="mt-2 text-red">{reportError}</p>}
+        {(reportStatus === 'review_failed' || meta.profile_extract_failed || (reportError && !meta.profile_sync_pending)) && <Button className="mt-3" variant="outline" size="sm" disabled={retryingReport} onClick={() => void retryReport()}>{retryingReport ? '正在提交…' : review && reportStatus === 'reviewed' ? '只重试画像同步' : '重试生成报告'}</Button>}
+      </section>}
+
       <div className="stagger-children">
         {isRecording && !isRecordingDual ? (
           <SoloRecordingReview topicsCovered={topicsCovered} overall={overall} />
@@ -655,6 +731,10 @@ export default function Review() {
                 </div>
               </CardContent>
             </Card>
+
+            {currentMode === "resume" && (
+              <ResumeReferenceAnswers key={sessionId} sessionId={sessionId} questions={questions} transcript={messages} initialAnswers={referenceAnswers} attempts={Array.isArray(meta.training_attempts) ? meta.training_attempts : []} />
+            )}
 
             {messages.length > 0 && (
               <div className="mb-6">
@@ -685,7 +765,7 @@ export default function Review() {
         {currentMode && currentMode !== "recording" && !isCopilot && (
           <Button variant="gradient" onClick={handleRestart} disabled={restarting}>
             <RotateCcw size={15} className={restarting ? "animate-spin" : ""} />
-            {restarting ? "正在生成题目..." : "再次练习"}
+            {restarting ? "正在生成题目..." : currentMode === 'resume' ? "选择资料再练一轮" : "再次练习"}
           </Button>
         )}
         <Button variant="outline" onClick={() => navigate("/")}>
