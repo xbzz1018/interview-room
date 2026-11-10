@@ -52,3 +52,10 @@ design/
 
 # Local agent instructions
 AGENTS.md
+
+# Machine-specific interview notes; public overview lives in project-case/roadmap.
+个人版使用说明.md
+docs/personal-acceptance.md
+docs/personal-interview-roadmap.md
+docs/personal-latency.md
+design-qa.md

@@ -1,6 +1,10 @@
 # Summary
 
 * [文档首页](README.md)
+* [个人训练闭环案例](project-case.md)
+* [工程与公开展示改进](project-roadmap.md)
+* [个人产品实施计划](personal-project-plan.md)
+* [图标与品牌规范](brand.md)
 * [部署说明](deployment.md)
 * [外部服务配置](external-services.md)
 * [快速开始](quick-start.md)

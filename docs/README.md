@@ -1,40 +1,23 @@
-# TechSpar 文档中心
+# 面试练习室：文档
 
-如果你是第一次接触这个项目，建议先关心两件事：
+从 [项目首页](../README.md) 了解一轮训练，从 [案例](project-case.md) 检查个人修改、代码位置与工程取舍。
 
-1. 项目怎么启动。
-2. 项目跑起来之后，新手第一天应该怎么玩。
+## 使用
 
-如果你是第一次接触这个项目，建议按下面顺序阅读：
+- [设置与模型接入](settings.md)
+- [简历模拟、材料与模式](resume-mock.md)
+- [如何使用复盘与重答](training-results.md)
+- [岗位备面](jd-preparation.md)
+- [可选语音及搜索服务](external-services.md)
+- [合成项目材料](../examples/project-brief.md) 与 [合成 JD](../examples/job-description.md)
 
-1. [部署说明](deployment.md)：把项目跑起来。
-2. [外部服务配置](external-services.md)：需要启用 Copilot 语音、联网搜索或录音转写时再看。
-3. [快速开始](quick-start.md)：确认你能正常登录并完成第一轮体验。
-4. [新手上手](getting-started.md)：按真实产品流程开始使用，而不是盲目点页面。
+## 实现与计划
 
-之后再按需求查阅：
+- [训练闭环案例](project-case.md)
+- [架构与技术选型](typescript-backend-architecture.md)
+- [工程与公开展示改进](project-roadmap.md)
+- [个人产品实施计划](personal-project-plan.md)
+- [图标与品牌规范](brand.md)
+- [来源、个人增量及第三方条款](../NOTICE.md)
 
-- [题库与知识库](knowledge-base.md)
-- [专项训练怎么玩](special-training.md)
-- [简历模拟面试](resume-mock.md)
-- [JD 定向备面](jd-preparation.md)
-- [面试 Copilot](copilot.md)
-- [录音复盘](recording-review.md)
-- [我的画像与领域回顾](profile-retrospective.md)
-- [题目图谱](graph.md)
-- [设置](settings.md)
-- [训练结果怎么看](training-results.md)
-- [常见问题](faq.md)
-- [开发者说明](developer.md)
-- [Hono / TypeScript / Electron 迁移实施记录](hono-typescript-migration.md)
-- [TypeScript 迁移完整性收尾清单](typescript-migration-closeout.md)
-- [TypeScript 后端架构](typescript-backend-architecture.md)
-- [第二阶段响应契约与兼容规则](response-contracts-phase-two.md)
-- [第三阶段 WS / SSE 事件契约](response-contracts-phase-three.md)
-- [v0.3.2 发布说明](releases/v0.3.2.md)
-- [v0.3.1 发布说明](releases/v0.3.1.md)
-- [v0.3.0 发布说明](releases/v0.3.0.md)
-
-TechSpar 的核心不是单一页面或单次刷题，而是把专项训练、简历面试、JD 备面、实时 Copilot 与录音复盘串成同一条持续进化的技术面试闭环。
-
-文档里的功能描述以当前仓库实现为准，不写“理想上应该有”的流程。
+其它架构迁移、响应契约和版本记录包含沿用基础的历史信息，不代表本项目已经发布这些历史安装包。它们保留作技术追溯，实际使用入口以首页为准。

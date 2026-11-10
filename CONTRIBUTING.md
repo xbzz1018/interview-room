@@ -1,10 +1,12 @@
 # 参与贡献
 
-谢谢你愿意花时间让 TechSpar 变得更好。修复问题、补充测试、改进文档和完善功能都欢迎参与。
+欢迎参与面试练习室。修复问题、补充测试、改进文档和完善功能都欢迎参与。
+
+个人修改范围与保留的来源见 [NOTICE](NOTICE.md)。问题与改进请提交到 [xbzz1018/interview-room](https://github.com/xbzz1018/interview-room)，请勿将个人版问题发到上游。
 
 ## 开始之前
 
-- 遇到 bug 或有产品建议，可以直接创建 [Issue](https://github.com/AnnaSuSu/TechSpar/issues)，请说明运行方式、平台、复现步骤以及期望和实际结果。
+- 遇到 bug 或有产品建议，请在当前仓库创建 Issue，请说明运行方式、平台、复现步骤以及期望和实际结果。
 - 小型修复和文档改进可以直接提交 PR。
 - 新功能、架构调整或破坏兼容性的改动，建议先通过 Issue 对齐范围。
 
@@ -15,8 +17,7 @@
 要求 Bun `1.3.14` 或兼容的 `1.3.x`。首次安装：
 
 ```bash
-git clone https://github.com/AnnaSuSu/TechSpar.git
-cd TechSpar
+# 进入当前仓库根目录
 bun install --frozen-lockfile
 cp .env.example .env
 ```
@@ -104,7 +105,7 @@ bun run pack:desktop         # 当前平台的完整未安装应用目录
 
 ```bash
 bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-dir=/srv/techspar/data
-# 预检通过后停止所有 TechSpar 进程
+# 预检通过后停止所有本项目桌面与服务端进程
 bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-dir=/srv/techspar/data --confirm
 ```
 
@@ -112,9 +113,9 @@ bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-
 
 ## 发布维护
 
-推送与根 `package.json` 版本完全一致的 `vX.Y.Z` tag，会触发 GitHub Actions 分别构建 macOS arm64 和 Windows x64 安装包、保存 Actions artifacts、生成 `SHA256SUMS.txt`，并创建或更新同名 GitHub Release。tag 不匹配时发布会直接失败。
+当前只有 `.github/workflows/ci.yml`，没有个人版发布工作流；创建 tag 不会自动发布安装包。Windows 个人目录包的构建与验证见 [部署说明](docs/deployment.md)。
 
-未配置证书时工作流生成未签名安装包。可选签名 secrets 为 `MAC_CSC_LINK`、`MAC_CSC_KEY_PASSWORD`、`WIN_CSC_LINK` 和 `WIN_CSC_KEY_PASSWORD`；macOS 公证还需要完整配置 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 与 `APPLE_TEAM_ID`。不要把证书或密码写入仓库文件。
+公开发布前先完成 [改进计划](docs/project-roadmap.md) 的 P0，再添加版本校验、目标平台实测、许可证资源核对、安装包校验和及所需签名。证书与凭据不进入仓库。
 
 ## 提交与 PR
 
@@ -125,6 +126,6 @@ bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-
 
 ## License
 
-项目整体使用 [AGPL-3.0](LICENSE)。提交贡献即表示同意以相同条款发布。
+根目录保留 [AGPL-3.0](LICENSE)。新增贡献应与相应模块许可兼容，不擅自重许可继承代码。
 
-`frontend/src/resume/` 移植自 [Magic Resume](https://github.com/JOYCEQL/magic-resume)，保留该目录中的原始协议和附加商业限制；向该目录贡献时请同时遵守其 `LICENSE` 与 `README.md`。
+`frontend/src/resume/` 移植自 [Magic Resume](https://github.com/JOYCEQL/magic-resume)，保留该目录中的原始协议和附加商业限制。该组合的分发兼容性尚未核定，需在公开分发前核定许可或替换复制实现，详见 [NOTICE](NOTICE.md)。

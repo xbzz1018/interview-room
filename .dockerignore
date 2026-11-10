@@ -13,3 +13,12 @@ images
 .codex
 .agents
 AGENTS.md
+
+# Private desktop state and local-only notes
+local_tools
+data/users
+docs/personal-acceptance.md
+docs/personal-interview-roadmap.md
+docs/personal-latency.md
+个人版使用说明.md
+design-qa.md
