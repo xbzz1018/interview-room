@@ -25,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import PersonalDocumentEditor from '@/components/PersonalDocumentEditor';
 import {
   deleteConversation,
   deleteDocument,
@@ -104,6 +105,7 @@ interface DocumentLibraryProps {
   onChooseFile: () => void;
   onFile: (file?: File) => void;
   onRemove: (documentId: string) => void;
+  onEdit: (documentId: string) => void;
   headerAction?: ReactNode;
 }
 
@@ -113,6 +115,7 @@ function DocumentLibrary({
   onChooseFile,
   onFile,
   onRemove,
+  onEdit,
   headerAction,
 }: DocumentLibraryProps) {
   const [dragging, setDragging] = useState(false);
@@ -136,7 +139,7 @@ function DocumentLibrary({
               </span>
             </div>
             <div className="mt-1 text-[11px] leading-4 text-dim">
-              Agent 会检索与你问题相关的内容
+              管理简历、项目说明和面试学习资料
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -210,9 +213,10 @@ function DocumentLibrary({
                   <FileText size={15} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium" title={document.filename}>
+                  <button type="button" className="max-w-full truncate text-left text-[13px] font-medium hover:text-primary" title={document.filename} onClick={() => onEdit(document.document_id)}>
                     {document.filename}
-                  </div>
+                  </button>
+                  <button type="button" className="block text-[11px] text-primary" onClick={() => onEdit(document.document_id)}>预览 / 编辑 / 替换</button>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-dim">
                     <span>{formatBytes(document.size_bytes)}</span>
                     <span>·</span>
@@ -247,6 +251,7 @@ function DocumentLibrary({
 }
 
 export default function PersonalAgent() {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -402,10 +407,10 @@ export default function PersonalAgent() {
         <div>
           <div className="flex items-center gap-2 text-3xl font-display font-bold tracking-tight md:text-[38px]">
             <Sparkles className="text-primary" size={30} />
-            成长 Agent
+            资料与学习
           </div>
           <div className="mt-1 text-sm leading-6 text-dim">
-            基于你的画像、错题、训练历史和个人资料，持续认识你的学习搭档。
+            更新自己的资料，结合面试记录梳理知识和项目表达。
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-dim">
@@ -432,6 +437,7 @@ export default function PersonalAgent() {
         </div>
       )}
 
+      {editingId && <PersonalDocumentEditor key={editingId} documentId={editingId} onClose={() => setEditingId(null)} onSaved={(value) => setDocuments((current) => current.map((item) => item.document_id === value.document_id ? value : item))} />}
       <input
         ref={fileRef}
         type="file"
@@ -510,7 +516,7 @@ export default function PersonalAgent() {
                   </div>
                   <div className="text-xl font-semibold">这次想从哪里开始？</div>
                   <div className="mt-2 max-w-lg text-sm leading-6 text-dim">
-                    你可以直接提问，也可以让我根据已有画像、错题和资料主动帮你诊断。
+                    结合已有面试记录和资料，补一个知识点，或把项目讲清楚。
                   </div>
                   <div className="mt-6 grid w-full gap-2 md:grid-cols-3">
                     {STARTERS.map(({ icon: Icon, text }) => (
@@ -581,7 +587,7 @@ export default function PersonalAgent() {
                       submit();
                     }
                   }}
-                  placeholder="问点什么，或让 Agent 根据你的情况主动分析…"
+                  placeholder="例如：结合我的项目，讲解事务和唯一约束如何配合…"
                   className="min-h-[48px] max-h-32 resize-none rounded-2xl"
                   rows={1}
                   disabled={sending}
@@ -611,6 +617,7 @@ export default function PersonalAgent() {
                 onChooseFile={() => fileRef.current?.click()}
                 onFile={handleUpload}
                 onRemove={removeDocument}
+                onEdit={setEditingId}
                 headerAction={(
                   <Button
                     type="button"
@@ -651,7 +658,7 @@ export default function PersonalAgent() {
           <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-[min(92vw,360px)] border-l border-border bg-card p-4 text-text shadow-2xl outline-none">
             <Dialog.Title className="sr-only">我的资料库</Dialog.Title>
             <Dialog.Description className="sr-only">
-              上传和管理成长 Agent 可以检索的个人资料
+              上传、编辑和替换面试资料，也可供学习对话检索
             </Dialog.Description>
             <DocumentLibrary
               documents={documents}
@@ -659,6 +666,7 @@ export default function PersonalAgent() {
               onChooseFile={() => fileRef.current?.click()}
               onFile={handleUpload}
               onRemove={removeDocument}
+                onEdit={setEditingId}
               headerAction={(
                 <Dialog.Close asChild>
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="关闭资料库">
