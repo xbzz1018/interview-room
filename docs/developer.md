@@ -1,6 +1,6 @@
 # 开发者说明
 
-本文只描述 `main` 的当前实现。迁移前的 FastAPI/Python 代码已冻结在 `legacy/python-backend`，不要把两个分支连接到同一份可写数据。
+本文描述当前 TypeScript 实现。继承架构与个人扩展范围见 [NOTICE](../NOTICE.md)。如需回看迁移前的 FastAPI/Python 版本，按 [历史说明](legacy-python-backend.md) 使用独立 checkout 与数据副本。
 
 ## 技术栈
 

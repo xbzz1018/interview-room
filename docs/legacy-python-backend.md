@@ -6,11 +6,11 @@
 
 ## 如何查看
 
-查看旧版时**必须**使用独立 checkout 和迁移前的数据副本。推荐从当前 `main` checkout 创建只读 worktree：
+查看旧版时**必须**使用独立 checkout 和迁移前的数据副本。以下假设 `upstream` 指向 NOTICE 中的原项目；这是上游历史分支，不要求个人仓库存在同名分支：
 
 ```bash
-git fetch origin legacy/python-backend
-git worktree add --detach ../TechSpar-python-legacy origin/legacy/python-backend
+git fetch upstream legacy/python-backend
+git worktree add --detach ../TechSpar-python-legacy upstream/legacy/python-backend
 cp -R /path/to/pre-migration-data-backup/. ../TechSpar-python-legacy/data/
 ```
 
