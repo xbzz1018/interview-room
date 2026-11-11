@@ -54,3 +54,5 @@ export * from './voiceprint/ports.ts'
 export * from './voiceprint/voiceprint-service.ts'
 export * from './provider/events.ts'
 export type { TrainingAttempt, TrainingGap } from './interview/training.ts'
+
+export * from './evidence/project-evidence.ts'
