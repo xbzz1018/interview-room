@@ -14,6 +14,8 @@ type TechSparDesktopBootstrapSession = {
 
 interface Window {
   techsparDesktop?: {
+    getKnowledgeDrafts?(): Promise<Record<string, { base: string; content: string }>>
+    setKnowledgeDraft?(key: string, draft: { base: string; content: string } | null): Promise<void>
     getRuntimeInfo(): Promise<TechSparDesktopRuntimeInfo>
     bootstrapSession(): Promise<TechSparDesktopBootstrapSession>
     getAppearanceTheme?(): Promise<'navy' | 'teal' | 'wine' | undefined>

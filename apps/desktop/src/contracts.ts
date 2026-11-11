@@ -7,6 +7,9 @@ export type DesktopRuntimeInfo = {
   nodeVersion: string
 }
 
+export const DESKTOP_DRAFTS_READ_CHANNEL = 'interview-room:drafts-read'
+export const DESKTOP_DRAFTS_WRITE_CHANNEL = 'interview-room:drafts-write'
+
 export const DESKTOP_RUNTIME_CHANNEL = 'techspar:runtime-info'
 export type DesktopAppearanceTheme = 'navy' | 'teal' | 'wine'
 export const DESKTOP_APPEARANCE_READ_CHANNEL = 'techspar:appearance-read'

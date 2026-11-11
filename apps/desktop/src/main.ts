@@ -4,16 +4,18 @@ import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { BackendSupervisor, type BackendLaunch, type BackendReady } from './backend-supervisor.ts'
-import { DESKTOP_APPEARANCE_READ_CHANNEL, DESKTOP_APPEARANCE_WRITE_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
+import { DESKTOP_DRAFTS_READ_CHANNEL, DESKTOP_DRAFTS_WRITE_CHANNEL, DESKTOP_APPEARANCE_READ_CHANNEL, DESKTOP_APPEARANCE_WRITE_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
 import { configureInterviewPermissions, sameOrigin } from './permissions.ts'
 import { loadOrCreateRuntimeSecrets } from './runtime-secrets.ts'
 import { AppearanceStore } from './appearance.ts'
+import { KnowledgeDraftStore } from './knowledge-drafts.ts'
 
 app.enableSandbox()
 if (process.env.TECHSPAR_DESKTOP_USER_DATA_DIR) app.setPath('userData', resolve(process.env.TECHSPAR_DESKTOP_USER_DATA_DIR))
 const singleInstance = app.requestSingleInstanceLock()
 if (!singleInstance) app.quit()
 const appearance = new AppearanceStore(join(app.getPath('userData'), 'appearance.json'))
+const drafts = new KnowledgeDraftStore(join(app.getPath('userData'), 'knowledge-drafts.json'))
 
 const sourceDir = fileURLToPath(new URL('.', import.meta.url))
 const smokeMode = process.argv.includes('--smoke-test')
@@ -92,6 +94,8 @@ function registerIpc(): void {
   }
   ipcMain.handle(DESKTOP_APPEARANCE_READ_CHANNEL, async (event) => { assertTrusted(event); return appearance.read() })
   ipcMain.handle(DESKTOP_APPEARANCE_WRITE_CHANNEL, async (event, theme: unknown) => { assertTrusted(event); await appearance.write(theme) })
+  ipcMain.handle(DESKTOP_DRAFTS_READ_CHANNEL, async (event) => { assertTrusted(event); return drafts.read() })
+  ipcMain.handle(DESKTOP_DRAFTS_WRITE_CHANNEL, async (event, key: unknown, draft: unknown) => { assertTrusted(event); await drafts.write(key, draft) })
   ipcMain.handle(DESKTOP_RUNTIME_CHANNEL, (event) => {
     assertTrusted(event)
     return runtimeInfo()
@@ -172,7 +176,7 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 app.on('before-quit', (event) => {
   if (quitting || !backend) return
   event.preventDefault(); quitting = true
-  void Promise.all([backend.stop(), appearance.flush()]).finally(() => app.quit())
+  void Promise.all([backend.stop(), appearance.flush(), drafts.flush()]).finally(() => app.quit())
 })
 
 void boot().catch((error) => {
