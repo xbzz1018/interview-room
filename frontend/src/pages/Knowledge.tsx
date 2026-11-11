@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react";
 import ReactMarkdown from "react-markdown";
 import { Menu, X, Sparkles, Upload, ChevronRight, ChevronDown } from "lucide-react";
 import { getTopicIcon } from "../utils/topicIcons";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { draftStorageStatus, subscribeDraftStorage, captureSavedDraftCleanup, clearKnowledgeDraft, readKnowledgeDraft, saveKnowledgeDraft } from "../lib/knowledgeDrafts";
 
 interface TopicInfo {
   name?: string;
@@ -53,6 +54,29 @@ export default function Knowledge() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showAddTopic, setShowAddTopic] = useState(false);
+  const [loadedTopic, setLoadedTopic] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [topicsError, setTopicsError] = useState("");
+  const [reload, setReload] = useState(0);
+  const storageNotice = useSyncExternalStore(subscribeDraftStorage, draftStorageStatus);
+  const [draftNotice, setDraftNotice] = useState("");
+  const [draftWarning, setDraftWarning] = useState("");
+  const [coreSaved, setCoreSaved] = useState<string | null>(null);
+  const [hfSaved, setHfSaved] = useState(false);
+  // A generation also distinguishes A -> B -> A from the original A view.
+  const viewRef = useRef(0);
+  const topicRef = useRef<string | null>(null);
+
+  const resetView = () => {
+    setLoadedTopic(null); setLoadError(""); setCoreSaving(null); setHfSaving(false);
+    setCoreSaved(null); setHfSaved(false); setDraftWarning("");
+    setShowNewFile(false); setNewFileName("");
+  };
+  const selectTopic = (topic: string | null) => {
+    if (topic === selected) return;
+    resetView(); setSelected(topic);
+  };
+  const retryLoad = () => { resetView(); setReload(value => value + 1); };
 
   const refreshTopics = useCallback(async () => {
     const t = (await getTopics()) as unknown as Topics;
@@ -66,125 +90,156 @@ export default function Knowledge() {
       .then((data) => {
         if (!active) return;
         const nextTopics = data as unknown as Topics;
-        setTopics(nextTopics);
+        setTopicsError(""); setTopics(nextTopics);
         const keys = Object.keys(nextTopics);
         setSelected((current) => current && nextTopics[current] ? current : (keys[0] ?? null));
       })
-      .catch(() => {
-        if (active) setTopics({});
-      });
+      .catch(error => { if (active) setTopicsError(errorMessage(error)); });
     return () => { active = false; };
+  }, [reload]);
+
+  const restoreCore = useCallback((topic: string, files: CoreFile[]) => {
+    const drafts = files.map(file => ({ file, draft: readKnowledgeDraft(topic, "core", file.filename) }));
+    const restored = drafts.find(({ file, draft }) => draft && draft.content !== file.content);
+    setCoreFiles(files);
+    setExpandedFile(restored?.file.filename ?? files[0]?.filename ?? null);
+    setCoreEditing(restored?.file.filename ?? null);
+    setEditContent(Object.fromEntries(drafts.map(({ file, draft }) => [file.filename, draft?.content ?? file.content])));
+    const conflict = drafts.some(({ file, draft }) => draft && draft.content !== file.content && draft.base !== file.content);
+    setDraftNotice(conflict ? "已恢复本机草稿，但服务器内容已变化。保存前请核对；取消可恢复服务器版本。" : restored ? "已恢复本机草稿。点击保存后才会用于训练与检索。" : "");
   }, []);
 
-  const loadCore = useCallback(async (topic: string) => {
-    try {
-      const files = (await getCoreKnowledge(topic)) as unknown as CoreFile[];
-      setCoreFiles(files);
-      setExpandedFile(files[0]?.filename ?? null);
-      setCoreEditing(null);
-      setEditContent(Object.fromEntries(files.map((file) => [file.filename, file.content])));
-    } catch { setCoreFiles([]); }
-  }, []);
+  const loadCore = useCallback(async (topic: string, view: number) => {
+    const files = (await getCoreKnowledge(topic)) as unknown as CoreFile[];
+    if (viewRef.current !== view || topicRef.current !== topic) return;
+    restoreCore(topic, files);
+  }, [restoreCore]);
 
   useEffect(() => {
+    const view = ++viewRef.current;
+    topicRef.current = selected;
     if (!selected) return;
     let active = true;
     Promise.all([getCoreKnowledge(selected), getHighFreq(selected)])
       .then(([filesData, highFreqData]) => {
-        if (!active) return;
-        const files = filesData as unknown as CoreFile[];
-        const highFreqContent = (highFreqData as unknown as { content?: string | null }).content || "";
-        setCoreFiles(files);
-        setExpandedFile(files[0]?.filename ?? null);
-        setCoreEditing(null);
-        setEditContent(Object.fromEntries(files.map((file) => [file.filename, file.content])));
-        setHighFreq(highFreqContent);
-        setHighFreqDraft(highFreqContent);
-        setHfEditing(false);
+        if (!active || viewRef.current !== view) return;
+        restoreCore(selected, filesData as unknown as CoreFile[]);
+        const content = (highFreqData as unknown as { content?: string | null }).content || "";
+        const draft = readKnowledgeDraft(selected, "high_freq");
+        const restored = Boolean(draft && draft.content !== content);
+        setHighFreq(content); setHighFreqDraft(draft?.content ?? content); setHfEditing(restored);
+        if (restored) setDraftNotice(previous => draft!.base !== content ? "已恢复本机草稿，但服务器内容已变化。保存前请核对；取消可恢复服务器版本。" : previous || "已恢复本机草稿。点击保存后才会用于训练与检索。");
+        setLoadedTopic(selected);
       })
-      .catch(() => {
-        if (!active) return;
-        setCoreFiles([]);
-        setHighFreq("");
-        setHighFreqDraft("");
-        setHfEditing(false);
-      });
+      .catch(error => { if (active && viewRef.current === view) setLoadError(errorMessage(error)); });
     return () => { active = false; };
-  }, [selected]);
+  }, [selected, reload, restoreCore]);
+
+  const editCore = (filename: string, content: string) => {
+    if (!selected) return;
+    setEditContent(previous => ({ ...previous, [filename]: content }));
+    setCoreSaved(null);
+    const saved = coreFiles.find(file => file.filename === filename)?.content ?? "";
+    // Keep the original base after recovering a draft against a newer server version.
+    const base = readKnowledgeDraft(selected, "core", filename)?.base ?? saved;
+    if (!saveKnowledgeDraft(selected, "core", filename, base, content)) setDraftWarning("草稿暂存失败，请保持页面打开并保存，或先复制内容备份。");
+    else { setDraftWarning(""); if (base === saved) setDraftNotice(content !== saved ? "当前为本机草稿，可在正常重启后恢复；点击保存后用于训练与检索。" : ""); }
+  };
+
+  const editHighFreq = (content: string) => {
+    if (!selected) return;
+    setHighFreqDraft(content); setHfSaved(false);
+    const base = readKnowledgeDraft(selected, "high_freq")?.base ?? highFreq;
+    if (!saveKnowledgeDraft(selected, "high_freq", "", base, content)) setDraftWarning("草稿暂存失败，请保持页面打开并保存，或先复制内容备份。");
+    else { setDraftWarning(""); if (base === highFreq) setDraftNotice(content !== highFreq ? "当前为本机草稿，可在正常重启后恢复；点击保存后用于训练与检索。" : ""); }
+  };
 
   const handleSaveCore = async (filename: string) => {
-    if (!selected) return;
+    if (!selected || coreSaving) return;
+    const topic = selected, view = viewRef.current, content = editContent[filename] ?? "";
+    const saved = coreFiles.find(file => file.filename === filename)?.content;
+    const draft = readKnowledgeDraft(topic, "core", filename);
+    if (draft && draft.base !== saved && !confirm("服务器内容已变化，确定用当前草稿覆盖吗？取消编辑可查看服务器版本。")) return;
+    const discardSavedDraft = captureSavedDraftCleanup(topic, "core", filename, content);
     setCoreSaving(filename);
     try {
-      await updateCoreKnowledge(selected, filename, editContent[filename] || "");
-      setCoreFiles((prev) => prev.map((f) => f.filename === filename ? { ...f, content: editContent[filename] } : f));
-      setCoreEditing(null);
-    } catch (e) { alert("保存失败: " + errorMessage(e)); }
-    setTimeout(() => setCoreSaving(null), 1500);
+      await updateCoreKnowledge(topic, filename, content);
+      discardSavedDraft();
+      if (viewRef.current !== view) return;
+      setCoreFiles(previous => previous.map(file => file.filename === filename ? { ...file, content } : file));
+      setCoreEditing(null); setCoreSaved(filename); setDraftNotice("");
+    } catch (error) { alert("保存失败: " + errorMessage(error)); }
+    finally { if (viewRef.current === view) setCoreSaving(null); }
   };
 
   const handleSaveHighFreq = async () => {
-    if (!selected) return;
+    if (!selected || hfSaving) return;
+    const topic = selected, view = viewRef.current, content = highFreqDraft;
+    const draft = readKnowledgeDraft(topic, "high_freq");
+    if (draft && draft.base !== highFreq && !confirm("服务器内容已变化，确定用当前草稿覆盖吗？取消编辑可查看服务器版本。")) return;
+    const discardSavedDraft = captureSavedDraftCleanup(topic, "high_freq", "", content);
     setHfSaving(true);
     try {
-      await updateHighFreq(selected, highFreqDraft);
-      setHighFreq(highFreqDraft);
-      setHfEditing(false);
-    } catch (e) { alert("保存失败: " + errorMessage(e)); }
-    setTimeout(() => setHfSaving(false), 1500);
+      await updateHighFreq(topic, content);
+      discardSavedDraft();
+      if (viewRef.current !== view) return;
+      setHighFreq(content); setHfEditing(false); setHfSaved(true); setDraftNotice("");
+    } catch (error) { alert("保存失败: " + errorMessage(error)); }
+    finally { if (viewRef.current === view) setHfSaving(false); }
   };
 
   const handleCreateFile = async () => {
     if (!selected) return;
-    const name = newFileName.trim();
+    const topic = selected, view = viewRef.current, name = newFileName.trim();
     if (!name) return;
-    const fname = name.endsWith(".md") ? name : name + ".md";
     try {
-      await createCoreKnowledge(selected, fname, "");
-      setNewFileName("");
-      setShowNewFile(false);
-      loadCore(selected);
-    } catch (e) { alert("创建失败: " + errorMessage(e)); }
+      await createCoreKnowledge(topic, name.endsWith(".md") ? name : name + ".md", "");
+      if (viewRef.current !== view) return;
+      setNewFileName(""); setShowNewFile(false);
+      await loadCore(topic, view);
+    } catch (error) { alert("创建失败: " + errorMessage(error)); }
   };
 
   const handleDeleteFile = async (filename: string) => {
-    if (!selected) return;
-    if (!confirm(`确定删除「${filename}」？此操作不可撤销。`)) return;
+    if (!selected || !confirm(`确定删除「${filename}」？此操作不可撤销。`)) return;
+    const topic = selected, view = viewRef.current;
     try {
-      await deleteCoreKnowledge(selected, filename);
-      setCoreFiles((prev) => prev.filter((f) => f.filename !== filename));
+      await deleteCoreKnowledge(topic, filename);
+      clearKnowledgeDraft(topic, "core", filename);
+      if (viewRef.current !== view) return;
+      setCoreFiles(previous => previous.filter(file => file.filename !== filename));
       if (expandedFile === filename) setExpandedFile(null);
-    } catch (e) { alert("删除失败: " + errorMessage(e)); }
+    } catch (error) { alert("删除失败: " + errorMessage(error)); }
   };
 
   const handleUploadFiles = async (files: File[]) => {
     if (!selected || files.length === 0) return;
+    const topic = selected, view = viewRef.current;
     setUploading(true);
     const failed: string[] = [];
     let lastUploaded: string | null = null;
-    for (const file of files) {
-      try {
-        const result = (await uploadKnowledgeDoc(selected, file)) as unknown as { filename: string };
-        lastUploaded = result.filename;
-      } catch (e) {
-        failed.push(`${file.name}: ${errorMessage(e)}`);
+    try {
+      for (const file of files) {
+        try { lastUploaded = ((await uploadKnowledgeDoc(topic, file)) as unknown as { filename: string }).filename; }
+        catch (error) { failed.push(`${file.name}: ${errorMessage(error)}`); }
       }
-    }
-    await loadCore(selected);
-    if (lastUploaded) setExpandedFile(lastUploaded);
-    if (failed.length) alert("以下文件导入失败:\n" + failed.join("\n"));
-    setUploading(false);
+      await loadCore(topic, view);
+      if (viewRef.current === view && lastUploaded) setExpandedFile(lastUploaded);
+      if (failed.length) alert("以下文件导入失败:\n" + failed.join("\n"));
+    } catch (error) { alert("刷新失败: " + errorMessage(error)); }
+    finally { setUploading(false); }
   };
 
   const handleGenerate = async () => {
     if (!selected) return;
+    const topic = selected, view = viewRef.current;
     setGenerating(true);
     try {
-      await generateKnowledge(selected);
-      await loadCore(selected);
-      setExpandedFile("README.md");
-    } catch (e) { alert("生成失败: " + errorMessage(e)); }
-    setGenerating(false);
+      await generateKnowledge(topic);
+      await loadCore(topic, view);
+      if (viewRef.current === view) setExpandedFile("README.md");
+    } catch (error) { alert("生成失败: " + errorMessage(error)); }
+    finally { setGenerating(false); }
   };
 
   const coreIsEmpty = coreFiles.length === 0 ||
@@ -192,7 +247,7 @@ export default function Knowledge() {
 
   const handleTopicCreated = async (key: string) => {
     await refreshTopics();
-    setSelected(key);
+    selectTopic(key);
   };
 
   const handleDeleteTopic = async (key: string) => {
@@ -201,7 +256,7 @@ export default function Knowledge() {
       await deleteTopic(key);
       const t = await refreshTopics();
       const keys = Object.keys(t);
-      if (selected === key) setSelected(keys.length > 0 ? keys[0] : null);
+      if (topicRef.current === key) selectTopic(keys.length > 0 ? keys[0] : null);
     } catch (e) { alert("删除失败: " + errorMessage(e)); }
   };
 
@@ -234,7 +289,7 @@ export default function Knowledge() {
                   "w-full px-3 py-2.5 rounded-lg text-sm text-left flex items-center gap-2 transition-all cursor-pointer",
                   selected === key ? "bg-hover text-text" : "text-dim hover:bg-hover"
                 )}
-                onClick={() => { setSelected(key); setSidebarOpen(false); }}
+                onClick={() => { selectTopic(key); setSidebarOpen(false); }}
               >
                 <span className="text-dim">{getTopicIcon(topics[key]?.icon, 16)}</span>
                 <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{topics[key]?.name || key}</span>
@@ -276,8 +331,15 @@ export default function Knowledge() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          {loadedTopic === selected && (storageNotice || draftWarning || draftNotice) && <p role="status" className="mb-3 text-sm text-dim">{storageNotice || draftWarning || draftNotice}</p>}
           {!selected ? (
-            <div className="text-center py-15 text-dim text-sm">选择一个领域</div>
+            <div className="text-center py-15 text-dim text-sm">
+              {topicsError ? <div role="alert"><p>加载失败：{topicsError}</p><Button variant="outline" size="sm" className="mt-3" onClick={retryLoad}>重新加载</Button></div> : "选择一个领域"}
+            </div>
+          ) : loadedTopic !== selected ? (
+            <div role={loadError ? "alert" : "status"} className="py-10 text-center text-sm text-dim">
+              {loadError ? <><p>加载失败：{loadError}</p><Button variant="outline" size="sm" className="mt-3" onClick={retryLoad}>重新加载</Button></> : "正在加载知识库…"}
+            </div>
           ) : tab === "core" ? (
             <div>
               <div className="text-[13px] text-dim mb-3">
@@ -344,12 +406,14 @@ export default function Knowledge() {
                               <textarea
                                 className="w-full min-h-[300px] p-3 rounded-lg border border-border bg-bg text-text text-[13px] font-mono leading-relaxed resize-y focus:outline-none focus:border-primary"
                                 value={editContent[f.filename] ?? f.content}
-                                onChange={(e) => setEditContent((prev) => ({ ...prev, [f.filename]: e.target.value }))}
+                                onChange={(e) => editCore(f.filename, e.target.value)}
+                                disabled={coreSaving === f.filename}
+                                aria-label="知识内容"
                                 autoFocus
                               />
                               <div className="flex gap-2 mt-3 justify-end">
-                                <Button variant="outline" size="sm" onClick={() => { setEditContent((prev) => ({ ...prev, [f.filename]: f.content })); setCoreEditing(null); }}>取消</Button>
-                                <Button variant="gradient" size="sm" onClick={() => handleSaveCore(f.filename)}>保存</Button>
+                                <Button variant="outline" size="sm" disabled={coreSaving === f.filename} onClick={() => { clearKnowledgeDraft(selected, "core", f.filename); setEditContent((prev) => ({ ...prev, [f.filename]: f.content })); setCoreEditing(null); setDraftNotice(""); }}>取消</Button>
+                                <Button variant="gradient" size="sm" disabled={Boolean(coreSaving)} onClick={() => handleSaveCore(f.filename)}>{coreSaving === f.filename ? "保存中…" : "保存"}</Button>
                               </div>
                             </>
                           ) : (
@@ -362,7 +426,7 @@ export default function Knowledge() {
                                 <div className="text-dim text-sm py-6 text-center">空文件，点「编辑」添加内容</div>
                               )}
                               <div className="flex gap-2 mt-3 justify-end items-center">
-                                {coreSaving === f.filename && <span className="text-xs text-green mr-1">已保存</span>}
+                                {coreSaved === f.filename && <span className="text-xs text-green mr-1">已保存</span>}
                                 <Button variant="outline" size="sm" onClick={() => setCoreEditing(f.filename)}>编辑</Button>
                               </div>
                             </>
@@ -384,17 +448,19 @@ export default function Knowledge() {
                   <textarea
                     className="w-full min-h-[500px] p-3 rounded-xl border border-border bg-bg text-text text-[13px] font-mono leading-relaxed resize-y focus:outline-none focus:border-primary"
                     value={highFreqDraft}
-                    onChange={(e) => setHighFreqDraft(e.target.value)}
+                    onChange={(e) => editHighFreq(e.target.value)}
+                    disabled={hfSaving}
+                    aria-label="高频题内容"
                     placeholder={"# 高频题\n\n## 1. xxx原理是什么？为什么这样设计？\n\n## 2. 实际项目中遇到xxx问题怎么解决？"}
                     autoFocus
                   />
                   <div className="flex gap-2 mt-3 justify-end">
-                    {hfSaving && <span className="text-xs text-green self-center mr-3">已保存</span>}
+                    {hfSaved && <span className="text-xs text-green self-center mr-3">已保存</span>}
                     {highFreqDraft !== highFreq && (
-                      <Button variant="outline" size="sm" onClick={() => setHighFreqDraft(highFreq)}>撤销修改</Button>
+                      <Button variant="outline" size="sm" disabled={hfSaving} onClick={() => { clearKnowledgeDraft(selected, "high_freq"); setHighFreqDraft(highFreq); setDraftNotice(""); }}>撤销修改</Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => { setHighFreqDraft(highFreq); setHfEditing(false); }}>取消</Button>
-                    <Button variant="gradient" size="sm" onClick={handleSaveHighFreq} disabled={highFreqDraft === highFreq}>保存</Button>
+                    <Button variant="outline" size="sm" disabled={hfSaving} onClick={() => { clearKnowledgeDraft(selected, "high_freq"); setHighFreqDraft(highFreq); setHfEditing(false); setDraftNotice(""); }}>取消</Button>
+                    <Button variant="gradient" size="sm" onClick={handleSaveHighFreq} disabled={hfSaving || highFreqDraft === highFreq}>{hfSaving ? "保存中…" : "保存"}</Button>
                   </div>
                 </>
               ) : (
@@ -407,7 +473,7 @@ export default function Knowledge() {
                     <div className="text-dim text-sm py-10 text-center rounded-xl border border-border bg-bg">暂无高频题，点「编辑」添加</div>
                   )}
                   <div className="flex gap-2 mt-3 justify-end items-center">
-                    {hfSaving && <span className="text-xs text-green mr-1">已保存</span>}
+                    {hfSaved && <span className="text-xs text-green mr-1">已保存</span>}
                     <Button variant="outline" size="sm" onClick={() => setHfEditing(true)}>编辑</Button>
                   </div>
                 </>
