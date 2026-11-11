@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { getDocuments, type DocumentItem } from '@/api/personalAgent';
 import { PracticeProgress } from '@/components/InterviewPractice';
+import { ProjectEvidencePicker } from '@/components/ProjectEvidence';
 import useTaskStatus from "../hooks/useTaskStatus";
 
 const INTERVIEW_STEPS = [
@@ -108,6 +109,7 @@ export default function ResumeInterview({ embedded = false }: ResumeInterviewPro
   const [historyLoading, setHistoryLoading] = useState(true);
   const [targetRole, setTargetRole] = useState("");
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>([]);
   const [resumeDocumentId, setResumeDocumentId] = useState('');
   const [jdDocumentId, setJdDocumentId] = useState('');
@@ -170,6 +172,7 @@ export default function ResumeInterview({ embedded = false }: ResumeInterviewPro
         targetRole: targetRole.trim(),
         trainingMode,
         materialDocumentIds: materialIds,
+        evidenceProjectIds: evidenceIds,
         resumeDocumentId: resumeDocumentId || undefined,
         jdDocumentId: jdDocumentId || undefined,
         useResume: resumeSelected && !resumeDocumentId,
@@ -273,6 +276,7 @@ export default function ResumeInterview({ embedded = false }: ResumeInterviewPro
                 {documents.filter((item) => ![resumeDocumentId, jdDocumentId].includes(item.document_id)).map((item) => <label key={item.document_id} className="flex cursor-pointer items-center gap-3 border-b border-border/60 py-3 text-sm last:border-0"><input type="checkbox" className="h-4 w-4 shrink-0" checked={materialIds.includes(item.document_id)} onChange={(event) => setMaterialIds((current) => event.target.checked ? [...current, item.document_id] : current.filter((id) => id !== item.document_id))} /><span className="min-w-0 break-all">{item.filename}</span></label>)}
                 {!documents.length && !materialError && <p className="mt-2 text-xs leading-6 text-dim">还没有项目说明，可先到资料库添加，再回来选择。</p>}
               </fieldset>
+              <ProjectEvidencePicker selected={evidenceIds} onChange={setEvidenceIds} />
               {materialError && <p role="alert" className="mt-2 text-xs text-red">资料库读取失败：{materialError}</p>}
               <Button variant="link" size="sm" onClick={() => navigate('/personal-agent')}>管理、编辑与替换资料</Button>
               <p className="mt-2 text-xs text-dim">{trainingMode === 'coach' ? '主动说“给我一个提示”或“讲解后让我重答”。练习观察会保留，受帮助的回答不进入独立作答分数趋势。' : '面试中只提问，不展示参考答法。结束后查看复盘，再进行重答练习。'}</p>
