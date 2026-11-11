@@ -4,6 +4,10 @@
 
 个人修改范围与保留的来源见 [NOTICE](NOTICE.md)。问题与改进请提交到 [xbzz1018/interview-room](https://github.com/xbzz1018/interview-room)，请勿将个人版问题发到上游。
 
+## 当前维护
+
+产品规划、主分支审阅与个人版本发布由 **@xbzz1018** 负责，代码审阅范围见 [.github/CODEOWNERS](.github/CODEOWNERS)。GitHub Contributors 展示历史提交作者，不是当前维护团队名单；继承部分及修改范围见 [NOTICE](NOTICE.md)。
+
 ## 开始之前
 
 - 遇到 bug 或有产品建议，请在当前仓库创建 Issue，请说明运行方式、平台、复现步骤以及期望和实际结果。

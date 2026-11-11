@@ -4,6 +4,8 @@
 
 Personal technical interview practice using your resume, project evidence and target job description. Connect your own model API, answer independently, review the evidence and retry in your own words.
 
+**Maintainer: @xbzz1018** · [Contributing](CONTRIBUTING.md)
+
 [中文说明](README.md) · [Case study](docs/project-case.md) · [Roadmap](docs/project-roadmap.md) · [Attribution](NOTICE.md)
 
 ![Interview preparation using synthetic materials](images/personal-interview-setup.png)
@@ -14,6 +16,8 @@ Personal technical interview practice using your resume, project evidence and ta
 2. Choose a strict simulation or coaching practice. Return to an existing session to continue.
 3. Read the report as it is saved; profile synchronization continues separately. Generate and cache reference answers per question.
 4. Answer again and compare technical and expression gaps, with quotes checked against the original answers.
+
+Project source snapshots can be selected before a session. Reference answers retrieve relevant snippets and expose file/line/version citations. Knowledge drafts persist in the desktop data directory across normal restarts. See the [evidence guide](docs/project-evidence.md).
 
 The interface offers three persistent themes. Screenshots use synthetic materials and a local mock gateway.
 
