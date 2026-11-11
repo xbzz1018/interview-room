@@ -66,6 +66,15 @@ try {
   if(origin===new URL(prior.localOrigin).origin)throw new Error('Restart must use a different origin to verify durable appearance');
   if(await evaluate('window.techsparDesktop.getAppearanceTheme()')!=='wine')throw new Error('Lost saved preference after restart');
   checks.push('saved theme restored after a real process restart on a different port');
+  await evaluate(`document.querySelector('nav[aria-label="主要导航"] a[href="/knowledge"]').click()`);
+  await until(`document.body.innerText.includes('QA知识一')`);
+  await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim().endsWith('QA知识一')).click()`);
+  await until(`document.body.innerText.includes('核心知识库')`);
+  await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='高频题库').click()`);
+  await until(`document.querySelector('textarea[aria-label="高频题内容"]')?.value==='## QA 关闭软件后应恢复的未保存草稿'`);
+  await screenshot('knowledge-draft-after-process-restart');
+  checks.push('unsaved high-frequency draft restored after a real process restart on a different port');
+
   await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1024,deviceScaleFactor:1,mobile:false});
   await evaluate(`document.querySelector('nav[aria-label="主要导航"] a[href="/settings"]').click()`);
   await until(`document.querySelector('[data-tab-id="appearance"]')`);

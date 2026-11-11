@@ -28,7 +28,10 @@ const gateway = createServer(async (request, response) => {
     else if (workflowsMode && payload.instructions?.includes('你是面试分析引擎')) text = JSON.stringify({ session_summary: '合成资料验收', weak_points: [], strong_points: [], behavior_signals: [], topic_mastery: {} });
     else if (workflowsMode && payload.instructions?.includes('你是个人面试训练教练')) text = JSON.stringify({ comparison: '重答增加了验证顺序，但还需要补充证据。', technical_gaps: [{ point: '缺少并发验证', evidence: '尚未压测', exercise: '写一个并发重复请求用例' }], expression_gaps: [] });
     else if (workflowsMode && payload.instructions?.includes('正在帮候选人复盘')) text = '# 面试复盘\n这是一轮使用合成资料进行的界面验收。请结合原理、取舍和验证说明项目。';
-    else if (workflowsMode && payload.instructions?.includes('你是技术面试教练')) text = '## 考察意图\n确认本人职责与技术判断。\n## 回答框架\n先说事实，再说验证。\n## 口述示例\n这是界面验收的合成示例，个人职责待补充。\n## 后续追问\n你如何验证并发写入？';
+    else if (workflowsMode && payload.instructions?.includes('你是技术面试教练')) {
+      const cited = (payload.input || []).some(item => item.content?.includes('qa-orders.sql')) ? ' 当前练习实现使用数据库唯一约束 [S1]。' : '';
+      text = '## 考察意图\n确认本人职责与技术判断。\n## 回答框架\n先说事实，再说验证。\n## 口述示例\n这是界面验收的合成示例，个人职责待补充。\n## 后续追问\n你如何验证并发写入？' + cited;
+    }
     else if (workflowsMode && !payload.instructions?.includes('专项训练出题引擎')) {
       text = (payload.input || []).some(item => item.content?.includes('面试开始'))
         ? '你好，欢迎参加 Java 后端开发面试。请先做一个简短的自我介绍。'
@@ -240,6 +243,10 @@ try {
     await chooseTheme('teal');
     await evaluate('location.reload()');
     await until(`document.documentElement?.dataset.appearance==='teal' && [...document.querySelectorAll('button')].some(button=>button.innerText.includes('开始实时模拟')&&!button.disabled)`);
+    const qaProject = { project_id:'qa-orders', name:'QA 订单项目', aliases:['数据库接口','事务','唯一约束'], sources:[{ source_id:'orders', path:'src/qa-orders.sql', kind:'personal_reproduction', sha256:'a'.repeat(64), revision:'qa-fixture-v1', start_line:31, topics:['Java','Spring','数据库接口','事务','唯一约束'], notes:'合成验收源码', content:'-- Java Spring 数据库接口\n-- 自我介绍：本练习实现订单创建\nCREATE TABLE orders (key TEXT UNIQUE);\n-- 唯一约束防止重复写入' }] };
+    await evaluate(`(()=>{const input=document.querySelector('input[aria-label="导入项目快照"]');const files=new DataTransfer();files.items.add(new File([${JSON.stringify(JSON.stringify(qaProject))}],'qa-project.json',{type:'application/json'}));input.files=files.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await until(`document.querySelector('[aria-label="项目源码与题卡"]')?.innerText.includes('QA 订单项目')`);
+    await evaluate(`document.querySelector('[aria-label="项目源码与题卡"] input[type="checkbox"]').click()`);
     await writeFile(join(qaDir, 'resume-setup.png'), Buffer.from((await cdp('Page.captureScreenshot', {format:'png'})).data, 'base64'));
     await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.includes('开始实时模拟')).click()`);
     await until(`location.pathname.startsWith('/interview/') && document.body?.innerText.includes('请先做一个简短的自我介绍') && document.querySelector('textarea')`);
@@ -271,11 +278,12 @@ try {
     if (await evaluate(`document.documentElement.dataset.appearance`) !== 'wine') throw new Error('Review lost appearance selection');
     if (await evaluate(`document.querySelector('nav[aria-label="主要导航"] a[href="/history"]').getAttribute('aria-current')`) !== 'page') throw new Error('Review lost its navigation context');
     await evaluate(`[...document.querySelectorAll('button')].find(button => button.innerText.trim() === '生成参考答法').click()`);
-    await until(`document.body?.innerText.includes('个人职责待补充')`);
+    await until(`document.body?.innerText.includes('个人职责待补充') && document.querySelector('[aria-label="参考答法的源码依据"] summary')?.textContent.includes('qa-orders.sql:31')`);
+    await evaluate(`document.querySelector('[aria-label="参考答法的源码依据"] details').open = true`);
     await writeFile(join(qaDir, 'resume-reference.png'), Buffer.from((await cdp('Page.captureScreenshot', {format:'png'})).data, 'base64'));
     const requestsBeforeReviewReload = gatewayRequests.length;
     await evaluate('location.reload()');
-    await until(`document.body?.innerText.includes('个人职责待补充')`);
+    await until(`document.body?.innerText.includes('个人职责待补充') && document.querySelector('[aria-label="参考答法的源码依据"] summary')?.textContent.includes('qa-orders.sql:31')`);
     if (gatewayRequests.length !== requestsBeforeReviewReload) throw new Error('Reload generated a cached reference answer again.');
     await evaluate(`(() => { const input=document.querySelector('textarea[aria-label="再次作答"]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'事务与唯一约束保证写入一致，尚未压测'); input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
     await sleep(100);
@@ -342,6 +350,52 @@ try {
       if(saved.source!=='user'||saved.llm.model!==${JSON.stringify(testModel)}||saved.llm.compatibility!=='responses'||saved.llm.reasoning_effort!=='xhigh'||saved.llm.http_headers?.['x-openai-actor-authorization']!=='local-image-extension') throw new Error('Personal API settings changed while saving');
     })()`);
     await writeFile(join(qaDir,'personal-settings.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    const qaKnowledge = await evaluate(`(async()=>{
+      const headers={Authorization:'Bearer '+JSON.parse(localStorage.getItem('techspar-session')).token,'Content-Type':'application/json'};
+      const create=async(name)=>{const response=await fetch('/api/topics',{method:'POST',headers,body:JSON.stringify({name})});if(!response.ok)throw new Error('Cannot create QA topic');return (await response.json()).key;};
+      const first=await create('QA知识一'), second=await create('QA知识二');
+      const created=await fetch('/api/knowledge/'+first+'/core',{method:'POST',headers,body:JSON.stringify({filename:'qa-evidence.md',content:'QA 原始知识'})});
+      if(!created.ok)throw new Error('Cannot create QA knowledge');
+      return {first,second};
+    })()`);
+    await evaluate(`location.href='/knowledge'`);
+    await until(`document.body?.innerText.includes('QA知识一')`);
+    const chooseKnowledge = async name => {
+      await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim().endsWith(${JSON.stringify(name)})).click()`);
+      await until(`!document.body?.innerText.includes('正在加载知识库') && (document.body.innerText.includes('导入文档') || document.body.innerText.includes('标记的高频面试考点'))`);
+    };
+    await chooseKnowledge('QA知识一');
+    await evaluate(`(()=>{const header=[...document.querySelectorAll('span')].find(span=>span.textContent==='qa-evidence.md').parentElement;if(!header.parentElement.innerText.includes('编辑'))header.click();})()`);
+    await until(`document.body.innerText.includes('QA 原始知识')`);
+    await evaluate(`(()=>{const card=[...document.querySelectorAll('span')].find(span=>span.textContent==='qa-evidence.md').parentElement.parentElement;[...card.querySelectorAll('button')].find(button=>button.innerText.trim()==='编辑').click();})()`);
+    await until(`document.querySelector('textarea[aria-label="知识内容"]')`);
+    const typeKnowledge = async (label, text) => {
+      await evaluate(`(()=>{const input=document.querySelector('textarea[aria-label='+${JSON.stringify(JSON.stringify(label))}+']');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,${JSON.stringify(text)});input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+      await until(`document.body.innerText.includes('当前为本机草稿')`);
+    };
+    await typeKnowledge('知识内容','QA 草稿：并发请求由唯一约束保护');
+    await chooseKnowledge('QA知识二');
+    await chooseKnowledge('QA知识一');
+    await until(`document.querySelector('textarea[aria-label="知识内容"]')?.value==='QA 草稿：并发请求由唯一约束保护'`);
+    await evaluate(`location.reload()`);
+    await until(`document.body?.innerText.includes('QA知识一')`);
+    await chooseKnowledge('QA知识一');
+    await until(`document.querySelector('textarea[aria-label="知识内容"]')?.value==='QA 草稿：并发请求由唯一约束保护'`);
+    await writeFile(join(qaDir,'knowledge-draft-restored.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='保存').click()`);
+    await until(`!document.querySelector('textarea[aria-label="知识内容"]') && document.body.innerText.includes('已保存')`);
+    await evaluate(`(async()=>{const token=JSON.parse(localStorage.getItem('techspar-session')).token;const files=await(await fetch('/api/knowledge/'+${JSON.stringify(qaKnowledge.first)}+'/core',{headers:{Authorization:'Bearer '+token}})).json();if(!files.some(file=>file.filename==='qa-evidence.md'&&file.content==='QA 草稿：并发请求由唯一约束保护'))throw new Error('Knowledge save did not reach the backend');})()`);
+    await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='高频题库').click()`);
+    await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='编辑').click()`);
+    await typeKnowledge('高频题内容','## 为什么需要幂等和事务？');
+    await chooseKnowledge('QA知识二');
+    await chooseKnowledge('QA知识一');
+    await until(`document.querySelector('textarea[aria-label="高频题内容"]')?.value==='## 为什么需要幂等和事务？'`);
+    await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='保存').click()`);
+    await until(`!document.querySelector('textarea') && document.body.innerText.includes('为什么需要幂等和事务')`);
+    await evaluate(`[...document.querySelectorAll('button')].find(button=>button.innerText.trim()==='编辑').click()`);
+    await typeKnowledge('高频题内容','## QA 关闭软件后应恢复的未保存草稿');
+    await until(`!document.body.innerText.includes('正在保存本机草稿')`);
     await evaluate(`localStorage.removeItem('techspar-session');location.href='/'`);
     await until(`location.pathname === '/' && document.body?.innerText.includes('进入练习室')`);
     if (await evaluate(`/TechSpar|个人改造|套餐|赞助/.test(document.body.innerText)`)) throw new Error('Promotional UI remains on welcome page');
@@ -357,7 +411,7 @@ try {
       }
       if(window.techsparDesktop.openAudioSettings)throw new Error('Audio IPC remains');
     })()`);
-    const final = { ...result, workflowChecks: {personalHome:true,personalWelcome:true,contextualNavigation:true,knowledgeNavigation:true,collapsedNavigation:true,mobileNavigation:true,pdfResumePage:true,startButton:true,streamingChat:true,reloadTranscript:true,history:true,resumeReview:true,resumeReferenceAnswer:true,cachedReferenceAfterReload:true,knowledgePage:true,personalAgentPage:true,settingsPage:true,documentEditing:true,selectedMaterials:true,coachingMode:true,retryComparison:true,cachedComparisonAfterReload:true,practiceProgress:true,restartMaterialSelection:true,personalApiTestAndSave:true,commercialUiRemoved:true,textOnlyScope:true,retiredApiAbsent:true,audioIpcRemoved:true,sourceNoticePreserved:true,threeThemes:true,themePersistence:true,themeDraftPreserved:true,themeAcrossRoutes:true,settingsThemePicker:true,themeIpcValidation:true}, gatewayRequests, qaDir };
+    const final = { ...result, workflowChecks: {projectSnapshotImportAndSelection:true,referenceEvidencePreviewAndReload:true,unsavedDraftWrittenToDesktop:true,knowledgeDraftAfterTopicSwitch:true,knowledgeDraftAfterReload:true,knowledgeDraftSaved:true,highFrequencyDraftRestored:true,personalHome:true,personalWelcome:true,contextualNavigation:true,knowledgeNavigation:true,collapsedNavigation:true,mobileNavigation:true,pdfResumePage:true,startButton:true,streamingChat:true,reloadTranscript:true,history:true,resumeReview:true,resumeReferenceAnswer:true,cachedReferenceAfterReload:true,knowledgePage:true,personalAgentPage:true,settingsPage:true,documentEditing:true,selectedMaterials:true,coachingMode:true,retryComparison:true,cachedComparisonAfterReload:true,practiceProgress:true,restartMaterialSelection:true,personalApiTestAndSave:true,commercialUiRemoved:true,textOnlyScope:true,retiredApiAbsent:true,audioIpcRemoved:true,sourceNoticePreserved:true,threeThemes:true,themePersistence:true,themeDraftPreserved:true,themeAcrossRoutes:true,settingsThemePicker:true,themeIpcValidation:true}, gatewayRequests, qaDir };
     await writeFile(join(qaDir,'result.json'),JSON.stringify(final,null,2));
     await writeFile(join(root,'local_tools','desktop-validation.json'),JSON.stringify(final,null,2));
     console.log(JSON.stringify({stage:'workflow-ui-passed',checks:final.workflowChecks,qaDir}));
