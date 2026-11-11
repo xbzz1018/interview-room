@@ -160,3 +160,5 @@ export * from './personal-document-store.ts'
 export * from './data-archive.ts'
 export * from './system-restore.ts'
 export * from './voiceprint-repository.ts'
+
+export * from './project-evidence-store.ts'
