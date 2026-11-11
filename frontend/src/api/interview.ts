@@ -107,6 +107,7 @@ interface StartInterviewOptions {
   jobDescription?: StartInterviewBody["job_description"];
   trainingMode?: "strict" | "coach";
   materialDocumentIds?: string[];
+  evidenceProjectIds?: string[];
   resumeDocumentId?: string;
   jdDocumentId?: string;
   useResume?: boolean;
@@ -115,7 +116,7 @@ interface StartInterviewOptions {
 export async function startInterview(
   mode: InterviewMode,
   topic: StartInterviewBody["topic"] = null,
-  { numQuestions, divergence, targetRole, jobDescription, trainingMode, materialDocumentIds, resumeDocumentId, jdDocumentId, useResume }: StartInterviewOptions = {}
+  { numQuestions, divergence, targetRole, jobDescription, trainingMode, materialDocumentIds, evidenceProjectIds, resumeDocumentId, jdDocumentId, useResume }: StartInterviewOptions = {}
 ): Promise<ApiResponse<"/api/interview/start", "post">> {
   const body: StartInterviewBody = { mode, topic };
   if (numQuestions != null) body.num_questions = numQuestions;
@@ -123,6 +124,7 @@ export async function startInterview(
   if (targetRole != null) body.target_role = targetRole;
   if (jobDescription != null) body.job_description = jobDescription;
   if (trainingMode != null) body.training_mode = trainingMode;
+  if (evidenceProjectIds != null) body.evidence_project_ids = evidenceProjectIds;
   if (materialDocumentIds != null) body.material_document_ids = materialDocumentIds;
   if (resumeDocumentId) body.resume_document_id = resumeDocumentId;
   if (jdDocumentId) body.jd_document_id = jdDocumentId;
