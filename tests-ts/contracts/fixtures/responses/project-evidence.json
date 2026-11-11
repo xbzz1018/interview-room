@@ -1,0 +1,10 @@
+{
+  "project_id": "atlas-python",
+  "name": "Atlas Python",
+  "aliases": [
+    "Atlas Python"
+  ],
+  "version": "snapshot-sha256",
+  "source_count": 1,
+  "imported_at": "2026-11-11T00:00:00.000Z"
+}

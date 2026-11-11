@@ -8,7 +8,7 @@ const unused = new Proxy({}, { get() { throw new Error('Retired routes must not 
 const dependencies = {
   auth: unused, registration: { allowRegistration: false }, settings: unused, settingsOperations: unused, quota: unused,
   tokens: unused, knowledge: unused, resume: unused, interview: unused, profile: unused,
-  personalAgent: unused, migration: unused,
+  personalAgent: unused, evidence: unused, migration: unused,
 } as unknown as AppDependencies
 
 test('the default interview host exposes text workflows without any media endpoints', async () => {

@@ -4940,6 +4940,15 @@
                     ],
                     "default": "strict"
                   },
+                  "evidence_project_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$"
+                    },
+                    "maxItems": 6,
+                    "default": []
+                  },
                   "material_document_ids": {
                     "type": "array",
                     "items": {
@@ -5397,6 +5406,83 @@
                     },
                     "cached": {
                       "type": "boolean"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "citation_id": {
+                            "type": "string"
+                          },
+                          "project_id": {
+                            "type": "string"
+                          },
+                          "project_name": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "source_id": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "current_source",
+                              "personal_reproduction",
+                              "historical_record",
+                              "user_reported_history",
+                              "reference_material",
+                              "test_definition",
+                              "practice_card",
+                              "interview_draft"
+                            ]
+                          },
+                          "kind_label": {
+                            "type": "string"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "revision": {
+                            "type": "string"
+                          },
+                          "start_line": {
+                            "type": "integer"
+                          },
+                          "end_line": {
+                            "type": "integer"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "notes": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "citation_id",
+                          "project_id",
+                          "project_name",
+                          "version",
+                          "source_id",
+                          "path",
+                          "kind",
+                          "kind_label",
+                          "sha256",
+                          "revision",
+                          "start_line",
+                          "end_line",
+                          "text",
+                          "notes"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
@@ -6191,6 +6277,242 @@
                   "required": [
                     "task_id",
                     "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/project-evidence": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Local project evidence versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "project_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "aliases": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "source_count": {
+                            "type": "integer"
+                          },
+                          "imported_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "project_id",
+                          "name",
+                          "aliases",
+                          "version",
+                          "source_count",
+                          "imported_at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "maxItems": 20
+                  },
+                  "sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 400
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "current_source",
+                            "personal_reproduction",
+                            "historical_record",
+                            "user_reported_history",
+                            "reference_material",
+                            "test_definition",
+                            "practice_card",
+                            "interview_draft"
+                          ]
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "revision": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "start_line": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "topics": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "maxItems": 20
+                        },
+                        "notes": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "content": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60000
+                        }
+                      },
+                      "required": [
+                        "source_id",
+                        "path",
+                        "kind",
+                        "sha256",
+                        "revision",
+                        "start_line",
+                        "topics",
+                        "notes",
+                        "content"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 80
+                  }
+                },
+                "required": [
+                  "project_id",
+                  "name",
+                  "aliases",
+                  "sources"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Import an immutable project snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project_id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "aliases": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "source_count": {
+                      "type": "integer"
+                    },
+                    "imported_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "project_id",
+                    "name",
+                    "aliases",
+                    "version",
+                    "source_count",
+                    "imported_at"
                   ],
                   "additionalProperties": false
                 }

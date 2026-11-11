@@ -30,7 +30,7 @@ async function loadSpecs(): Promise<{ baseline: Spec; current: Spec }> {
   const unavailable = new Proxy({}, { get() { return () => Promise.reject(new Error('not called while generating OpenAPI')) } })
   const deps = {
     auth: unavailable, registration: { allowRegistration: false }, settings: unavailable, settingsOperations: unavailable, quota: unavailable, tokens: unavailable,
-    knowledge: unavailable, resume: unavailable, interview: unavailable, profile: unavailable, personalAgent: unavailable, migration: unavailable, recording: unavailable,
+    knowledge: unavailable, resume: unavailable, interview: unavailable, profile: unavailable, personalAgent: unavailable, evidence: unavailable, migration: unavailable, recording: unavailable,
     legacyTranscription: true, copilotSessions: unavailable, copilotPrep: unavailable, copilotRealtime: unavailable, voiceprint: unavailable,
   } as unknown as AppDependencies
   const response = await createApp(deps).request('/openapi.json')

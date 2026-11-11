@@ -29,6 +29,8 @@ import { registerKnowledgeRoutes } from './routes/knowledge.ts'
 import { registerResumeRoutes } from './routes/resume.ts'
 import { registerInterviewRoutes } from './routes/interview.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
+import type { ProjectEvidenceService } from '@techspar/core'
+import { registerProjectEvidenceRoutes } from './routes/project-evidence.ts'
 import { registerPersonalAgentRoutes } from './routes/personal-agent.ts'
 import { registerDataMigrationRoutes } from './routes/data-migration.ts'
 import { registerRecordingRoutes } from './routes/recording.ts'
@@ -54,6 +56,7 @@ export type AppDependencies = {
   legacyTranscription?: boolean
   interview?: InterviewUseCases
   profile?: ProfileUseCases
+  evidence?: ProjectEvidenceService
   personalAgent?: PersonalAgentUseCases
   migration?: DataMigrationUseCases
   recording?: RecordingUseCases
@@ -99,6 +102,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
   registerResumeRoutes(app, deps)
   if (deps.interview) registerInterviewRoutes(app, { interview: deps.interview, tokens: deps.tokens })
   if (deps.profile) registerProfileRoutes(app, { profile: deps.profile, tokens: deps.tokens })
+  if (deps.evidence) registerProjectEvidenceRoutes(app, { evidence: deps.evidence, tokens: deps.tokens })
   if (deps.personalAgent) registerPersonalAgentRoutes(app, { personalAgent: deps.personalAgent, tokens: deps.tokens })
   if (deps.migration) registerDataMigrationRoutes(app, { migration: deps.migration, tokens: deps.tokens })
   if (deps.recording) registerRecordingRoutes(app, { recording: deps.recording, tokens: deps.tokens })

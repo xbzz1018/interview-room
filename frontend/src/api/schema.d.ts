@@ -1760,6 +1760,8 @@ export interface paths {
                          */
                         training_mode?: "strict" | "coach";
                         /** @default [] */
+                        evidence_project_ids?: string[];
+                        /** @default [] */
                         material_document_ids?: string[];
                         resume_document_id?: string;
                         jd_document_id?: string;
@@ -2141,6 +2143,23 @@ export interface paths {
                         "application/json": {
                             reference_answer: string;
                             cached: boolean;
+                            sources?: {
+                                citation_id: string;
+                                project_id: string;
+                                project_name: string;
+                                version: string;
+                                source_id: string;
+                                path: string;
+                                /** @enum {string} */
+                                kind: "current_source" | "personal_reproduction" | "historical_record" | "user_reported_history" | "reference_material" | "test_definition" | "practice_card" | "interview_draft";
+                                kind_label: string;
+                                sha256: string;
+                                revision: string;
+                                start_line: number;
+                                end_line: number;
+                                text: string;
+                                notes: string;
+                            }[];
                         };
                     };
                 };
@@ -2800,6 +2819,105 @@ export interface paths {
                             task_id: string;
                             /** @enum {string} */
                             status: "pending";
+                        };
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/project-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Local project evidence versions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                project_id: string;
+                                name: string;
+                                aliases: string[];
+                                version: string;
+                                source_count: number;
+                                imported_at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        project_id: string;
+                        name: string;
+                        aliases: string[];
+                        sources: {
+                            source_id: string;
+                            path: string;
+                            /** @enum {string} */
+                            kind: "current_source" | "personal_reproduction" | "historical_record" | "user_reported_history" | "reference_material" | "test_definition" | "practice_card" | "interview_draft";
+                            sha256: string;
+                            revision: string;
+                            start_line: number;
+                            topics: string[];
+                            notes: string;
+                            content: string;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Import an immutable project snapshot */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            project_id: string;
+                            name: string;
+                            aliases: string[];
+                            version: string;
+                            source_count: number;
+                            imported_at: string;
                         };
                     };
                 };
