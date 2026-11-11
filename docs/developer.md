@@ -85,6 +85,12 @@ bun run pack:desktop
 
 `smoke:local-embedding` 会下载一个公开的小型 ONNX 模型，验证编译后的 sidecar 确实能执行本地向量计算。`pack:desktop` 生成当前平台的未安装应用目录，不执行代码签名。
 
+## 项目证据与真实模型检查
+
+项目证据的接口、清单构建、导入和持久化见 [项目证据](project-evidence.md)。`bun test tests-ts/project-evidence.test.ts apps/desktop/src/knowledge-drafts.test.ts` 验证范围、快照、引用事务和草稿存储。
+
+`TECHSPAR_SMOKE_PROVIDER_DATA_DIR` 指向包含 `interviews.db` 的配置目录时，`bun scripts/evaluate-interview-quality.ts --live` 使用既有模型提交合成面试，结果写入忽略的 `local_tools/quality-*/`。`--review-only` 仅跑复盘/画像。会消费真实网关额度，不传真实简历；报告原文、时延、校验与人工审阅必须分别记录，不把模拟网关当作模型质量验证。
+
 ## 开发约束
 
 - 路由只做鉴权、校验、上下文组装和传输映射；业务规则下沉到 `packages/core`。

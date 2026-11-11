@@ -203,7 +203,7 @@ apps/desktop/src/main.ts
   -> create private runtime secrets and a dynamic loopback port
   -> spawn compiled apps/api Bun executable
   -> wait for structured readiness and load the same-origin React/Hono URL
-  -> expose only constrained runtime-info IPC
+  -> expose constrained runtime/bootstrap, appearance and knowledge-draft IPC
 ```
 
 `createApp()` 接收公开用例接口，不在内部 new 数据库、SDK 或业务 service。
@@ -238,5 +238,8 @@ CI 必须自动检查：
 - 简历复盘流式生成 Markdown，约每 500 毫秒保存 `meta.review_draft`；前端约每 1.5 秒轮询。完整报告先落库，再由既有持久化任务继续画像提取。完整报告存在时任务恢复只同步画像，未完成的生成不支持接续 token。
 - `POST /api/interview/compare-answer` 用 UUID 和内容识别重复请求，比较结果另存于会话训练记录，不改原问答。缺口证据必须是原答或重答的连续子串。`GET /api/interview/training-progress` 从最近 100 场简历面试聚合最多 100 条练习，页面展示最近 6 条并链接来源。
 - 重答比较仍是同步模型调用；同进程锁防并发，已保存结果有事务保护。未完成请求在进程退出后不会自行继续，不具备持久化任务的恢复语义。
+
+- 项目证据使用 `GET/POST /api/project-evidence` 导入和列出本机快照，core 的 `ProjectEvidenceService` 负责格式/选择/词项检索，platform 的 `FileProjectEvidenceStore` 保存账号隔离的不可变版本。开始参数 `evidence_project_ids` 冻结版本引用；参考答法最多检索 4 段，校验 `[S#]` 并在 SQLite 同一事务保存答法和来源预览。
+- 知识草稿由 Electron 主进程 `KnowledgeDraftStore` 保存到 userData，Preload 仅暴露读取和限定键写入，校验同源主 frame。Renderer 启动先读取，输入更新内存和主进程队列，正常退出等待已接受写入。网页版仍由浏览器 localStorage 保存。
 
 资料限额与使用入口见 [模拟面试](resume-mock.md)，验证方法与恢复边界见 [项目案例](project-case.md)，后续工作见 [改进计划](project-roadmap.md)。
