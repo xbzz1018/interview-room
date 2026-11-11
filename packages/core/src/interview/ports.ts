@@ -1,3 +1,4 @@
+import type { EvidenceHit, ProjectEvidenceService } from '../evidence/project-evidence.ts'
 import type { InterviewStreamEvent } from './results.ts'
 import type { TrainingAttempt } from './training.ts'
 import type { IdGenerator } from '../account/ports.ts'
@@ -35,7 +36,7 @@ export interface InterviewSessionRepository {
   updateStatus(sessionId: string, userId: string, status: SessionStatus, options?: { reviewError?: string; clearError?: boolean }): Promise<boolean>
   saveReview(input: { sessionId: string; userId: string; review: string; scores?: Array<Record<string, unknown>>; weakPoints?: unknown[]; overall?: Record<string, unknown> }): Promise<boolean>
   updateMeta(sessionId: string, userId: string, patch: Record<string, unknown>): Promise<boolean>
-  saveReferenceAnswer(sessionId: string, userId: string, questionId: string, answer: string): Promise<boolean>
+  saveReferenceAnswer(sessionId: string, userId: string, questionId: string, answer: string, sources?: EvidenceHit[]): Promise<boolean>
   saveTrainingAttempt(sessionId: string, userId: string, attempt: TrainingAttempt): Promise<boolean>
   list(input: { userId: string; limit: number; offset: number; mode?: InterviewMode; topic?: string }): Promise<{ items: SessionSummary[]; total: number }>
   delete(sessionId: string, userId: string): Promise<boolean>
@@ -88,7 +89,7 @@ export interface InterviewUseCases {
   end(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewReviewSubmissionResult>
   draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewDraftResult>
   generateReview(context: RequestContext, sessionId: string): Promise<InterviewReviewSubmissionResult>
-  referenceAnswer(context: RequestContext, sessionId: string, questionId: string | number): Promise<{ reference_answer: string; cached: boolean }>
+  referenceAnswer(context: RequestContext, sessionId: string, questionId: string | number): Promise<{ reference_answer: string; cached: boolean; sources?: EvidenceHit[] }>
   compareAnswer(context: RequestContext, sessionId: string, questionId: string | number, answer: string, requestId: string): Promise<TrainingAttempt>
   trainingProgress(context: RequestContext): Promise<{ items: Array<TrainingAttempt & { session_id: string; training_mode: string }> }>
   resume(context: RequestContext, sessionId: string): Promise<InterviewResumeResult>
@@ -112,5 +113,6 @@ export type InterviewDependencies = {
   settings: ProviderSettingsRepository
   profile: CandidateProfilePort
   materials?: { documentText(context: RequestContext, documentIds: string[]): Promise<Array<{ document_id: string; filename: string; content: string; updated_at: string }>> }
+  evidence?: ProjectEvidenceService
   maxQuestionsPerPhase?: number
 }

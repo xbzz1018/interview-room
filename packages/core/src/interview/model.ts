@@ -118,6 +118,7 @@ export type StartInterviewInput = {
   target_role?: string
   job_description?: string
   training_mode?: 'strict' | 'coach'
+  evidence_project_ids?: string[]
   material_document_ids?: string[]
   resume_document_id?: string
   jd_document_id?: string

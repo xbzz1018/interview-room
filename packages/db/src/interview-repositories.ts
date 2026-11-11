@@ -251,13 +251,14 @@ export class BunInterviewSessionRepository implements InterviewSessionRepository
     return transaction()
   }
 
-  async saveReferenceAnswer(sessionId: string, userId: string, questionId: string, answer: string): Promise<boolean> {
+  async saveReferenceAnswer(sessionId: string, userId: string, questionId: string, answer: string, sources?: import('@techspar/core').EvidenceHit[]): Promise<boolean> {
     const transaction = this.sqlite.transaction(() => {
-      const row = this.sqlite.query<{ reference_answers: string | null }, { $id: string; $userId: string }>('SELECT reference_answers FROM sessions WHERE session_id = $id AND user_id = $userId').get({ $id: sessionId, $userId: userId })
+      const row = this.sqlite.query<{ reference_answers: string | null; meta: string | null }, { $id: string; $userId: string }>('SELECT reference_answers, meta FROM sessions WHERE session_id = $id AND user_id = $userId').get({ $id: sessionId, $userId: userId })
       if (!row) return false
       const references = json<Record<string, string>>(row.reference_answers, {})
       references[questionId] = answer
-      this.sqlite.query('UPDATE sessions SET reference_answers = $references, updated_at = CURRENT_TIMESTAMP WHERE session_id = $id AND user_id = $userId').run({ $references: JSON.stringify(references), $id: sessionId, $userId: userId })
+      const meta = sources ? JSON.stringify({ ...json<Record<string, unknown>>(row.meta, {}), [`reference_sources:${questionId}`]: sources }) : row.meta
+      this.sqlite.query('UPDATE sessions SET reference_answers = $references, meta = $meta, updated_at = CURRENT_TIMESTAMP WHERE session_id = $id AND user_id = $userId').run({ $references: JSON.stringify(references), $meta: meta, $id: sessionId, $userId: userId })
       return true
     })
     return transaction()

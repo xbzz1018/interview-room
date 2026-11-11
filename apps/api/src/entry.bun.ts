@@ -9,6 +9,7 @@ import {
   KnowledgeIndexService,
   KnowledgeService,
   InterviewService,
+  ProjectEvidenceService,
   PersistentTaskQueue,
   ProfileService,
   PersonalAgentService,
@@ -22,6 +23,7 @@ import {
 import { BunDataMigrationRepository, BunInterviewSessionRepository, BunKnowledgeVectorRepository, BunPersonalAgentRepository, BunResumeInterviewStateRepository, BunTaskRepository, BunUsageRepository, BunUserRepository } from '@techspar/db'
 import {
   BcryptPasswordHasher,
+  FileProjectEvidenceStore,
   FileProviderSettingsRepository,
   FileKnowledgeStore,
   FileResumeStore,
@@ -115,7 +117,8 @@ const personalAgentRepository = new BunPersonalAgentRepository(config.dbPath)
 personalAgentRepository.initialize()
 const personalAgent = new PersonalAgentService({ repository: personalAgentRepository, files: new FilePersonalDocumentStore(config.dataDir), extractor: new PortablePersonalDocumentExtractor(), embeddings, ai, profile, ids: new ShortUuidGenerator() })
 const settingsOperations = new SettingsOperationsService({ chats: chatDrivers, embeddingDrivers, embeddings, index: knowledgeIndex, vectors: vectorRepository, knowledge: knowledgeStore, personal: personalAgent, profile, settings: settingsRepository })
-const interview = new InterviewService({ sessions, states: interviewStates, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, resume, knowledge: knowledgeIndex, knowledgeStore, settings: settingsRepository, profile, materials: personalAgent })
+const evidence = new ProjectEvidenceService(new FileProjectEvidenceStore(config.dataDir))
+const interview = new InterviewService({ sessions, states: interviewStates, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, resume, knowledge: knowledgeIndex, knowledgeStore, settings: settingsRepository, profile, materials: personalAgent, evidence })
 const migration = new DataMigrationService({ codec: new TarGzipArchiveCodec(), database: new BunDataMigrationRepository(config.dbPath), files: new FileMigrationStore(config.dataDir, config.voiceprintEncryptionKey), profiles: profileRepository, users })
 taskQueue.register('resume_review', (task) => interview.runReviewTask(task))
 taskQueue.register('drill_review', (task) => interview.runReviewTask(task))
@@ -126,7 +129,7 @@ for (const type of ['copilot_review', 'recording_review', 'copilot_prep']) taskQ
   throw new AppError('该功能已停用；已保存的历史记录仍可查看。', 410, 'feature_retired')
 })
 await taskQueue.start()
-const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
+const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, evidence, migration, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
 
 const server = Bun.serve(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server) }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))
