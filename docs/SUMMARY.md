@@ -4,6 +4,7 @@
 * [当前使用指南](README.md)
 * [模型与设置](settings.md)
 * [模拟面试与材料](resume-mock.md)
+* [源码与题卡引用](project-evidence.md)
 * [复盘、参考答法与重答](training-results.md)
 * [JD 定向备面](jd-preparation.md)
 * [模型与检索配置](external-services.md)

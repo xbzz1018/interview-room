@@ -6,6 +6,7 @@
 
 - [设置与模型接入](settings.md)
 - [简历模拟、材料与模式](resume-mock.md)
+- [源码与题卡引用](project-evidence.md)
 - [如何使用复盘与重答](training-results.md)
 - [岗位备面](jd-preparation.md)
 - [模型与资料检索配置](external-services.md)
