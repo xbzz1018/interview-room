@@ -15,6 +15,18 @@ function safeFilename(value: string): string {
 export class FileResumeStore implements ResumeStore {
   constructor(private readonly dataDir: string) {}
 
+  private readonly pending = new Map<string, Promise<void>>()
+
+  private async exclusive<T>(userId: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.pending.get(userId) ?? Promise.resolve()
+    let release!: () => void
+    const current = new Promise<void>(resolve => { release = resolve })
+    this.pending.set(userId, current)
+    await previous
+    try { return await action() }
+    finally { release(); if (this.pending.get(userId) === current) this.pending.delete(userId) }
+  }
+
   private directory(userId: string): string {
     return join(this.dataDir, 'users', safeSegment(userId, 'user id'), 'resume')
   }
@@ -31,38 +43,47 @@ export class FileResumeStore implements ResumeStore {
   }
 
   async status(userId: string): Promise<ResumeStatus> {
-    const filename = await this.find(userId)
-    if (!filename) return { has_resume: false }
-    return { has_resume: true, filename, size: (await stat(join(this.directory(userId), filename))).size }
+    return this.exclusive(userId, async () => {
+      const filename = await this.find(userId)
+      if (!filename) return { has_resume: false }
+      return { has_resume: true, filename, size: (await stat(join(this.directory(userId), filename))).size }
+    })
   }
 
   async read(userId: string): Promise<ResumeFile | undefined> {
-    const filename = await this.find(userId)
-    if (!filename) return undefined
-    return { filename, bytes: new Uint8Array(await readFile(join(this.directory(userId), filename))) }
+    return this.exclusive(userId, async () => {
+      const filename = await this.find(userId)
+      if (!filename) return undefined
+      return { filename, bytes: new Uint8Array(await readFile(join(this.directory(userId), filename))) }
+    })
   }
 
   async replace(userId: string, filename: string, bytes: Uint8Array): Promise<void> {
-    const directory = this.directory(userId)
-    await mkdir(directory, { recursive: true })
-    const target = join(directory, safeFilename(filename))
-    const temporary = join(directory, `.${crypto.randomUUID()}.upload`)
-    try {
-      await writeFile(temporary, bytes, { flag: 'wx' })
-      const entries = await readdir(directory, { withFileTypes: true })
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.toLowerCase().endsWith('.pdf')) await rm(join(directory, entry.name))
+    await this.exclusive(userId, async () => {
+      const directory = this.directory(userId)
+      await mkdir(directory, { recursive: true })
+      const target = join(directory, safeFilename(filename))
+      const temporary = join(directory, `.${crypto.randomUUID()}.upload`)
+      try {
+        await writeFile(temporary, bytes, { flag: 'wx' })
+        // Commit first: a failed rename must leave the previous resume readable.
+        await rename(temporary, target)
+        const entries = await readdir(directory, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.isFile() && entry.name !== filename && entry.name.toLowerCase().endsWith('.pdf')) await rm(join(directory, entry.name))
+        }
+      } finally {
+        await rm(temporary, { force: true }).catch(() => undefined)
       }
-      await rename(temporary, target)
-    } finally {
-      await rm(temporary, { force: true }).catch(() => undefined)
-    }
+    })
   }
 
   async delete(userId: string): Promise<boolean> {
-    const filename = await this.find(userId)
-    if (!filename) return false
-    await rm(join(this.directory(userId), filename))
-    return true
+    return this.exclusive(userId, async () => {
+      const filename = await this.find(userId)
+      if (!filename) return false
+      await rm(join(this.directory(userId), filename))
+      return true
+    })
   }
 }

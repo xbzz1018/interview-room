@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { AppError, ResumeService, type ChatMessage } from '@techspar/core'
@@ -47,6 +47,33 @@ describe('resume compatibility', () => {
     expect(stored.bytes).toEqual(pdf)
     expect(stored.bytes).toBeInstanceOf(Uint8Array)
     expect(Buffer.isBuffer(stored.bytes)).toBe(false)
+  })
+
+  test('keeps the original resume when committing the replacement fails', async () => {
+    await service.upload(context, 'original.pdf', pdf)
+    await mkdir(join(root, 'data/users/user-a/resume/blocked.pdf'))
+    await expect(service.upload(context, 'blocked.pdf', pdf)).rejects.toThrow()
+    expect(await service.status(context)).toMatchObject({ has_resume: true, filename: 'original.pdf' })
+    expect((await service.file(context)).bytes).toEqual(pdf)
+    expect((await readdir(join(root, 'data/users/user-a/resume'))).some(name => name.endsWith('.upload'))).toBeFalse()
+  })
+
+  test('serializes simultaneous resume replacements and leaves one readable PDF', async () => {
+    await service.upload(context, 'original.pdf', pdf)
+    const first = new TextEncoder().encode('%PDF-1.7 first replacement')
+    const second = new TextEncoder().encode('%PDF-1.7 second replacement')
+    await Promise.all([service.upload(context, 'first.pdf', first), service.upload(context, 'second.pdf', second)])
+    expect(await service.status(context)).toMatchObject({ has_resume: true, filename: 'second.pdf' })
+    expect((await service.file(context)).bytes).toEqual(second)
+    expect((await readdir(join(root, 'data/users/user-a/resume'))).filter(name => name.endsWith('.pdf'))).toEqual(['second.pdf'])
+  })
+
+  test('supports replacing the same filename and a read queued behind the replacement', async () => {
+    await service.upload(context, 'resume.pdf', pdf)
+    const replacement = new TextEncoder().encode('%PDF-1.7 newer resume')
+    const [, read] = await Promise.all([service.upload(context, 'resume.pdf', replacement), service.file(context)])
+    expect(read.bytes).toEqual(replacement)
+    expect(read.filename).toBe('resume.pdf')
   })
 
   test('rejects traversal, non-PDF content, and oversized metadata before writing', async () => {
