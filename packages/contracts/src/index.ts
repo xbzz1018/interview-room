@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { EvidenceHitSchema } from './project-evidence.ts'
+export * from './project-evidence.ts'
 import { InterviewModeSchema } from './interview-shared.ts'
 export * from './interview-shared.ts'
 export * from './interview-responses.ts'
@@ -174,6 +176,7 @@ export const StartInterviewSchema = z.object({
   target_role: z.string().optional(),
   job_description: z.string().max(12000).optional(),
   training_mode: z.enum(['strict', 'coach']).default('strict'),
+  evidence_project_ids: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,79}$/)).max(6).default([]),
   material_document_ids: z.array(z.string()).max(8).default([]),
   resume_document_id: z.string().optional(),
   jd_document_id: z.string().optional(),
@@ -188,7 +191,7 @@ export const JobPrepStartSchema = z.union([
 export const InterviewChatSchema = z.object({ session_id: z.string(), message: z.string() })
 export const EndInterviewSchema = z.object({ answers: z.array(InterviewAnswerSchema).default([]) })
 export const ReferenceAnswerRequestSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]) })
-export const ReferenceAnswerResponseSchema = z.object({ reference_answer: z.string(), cached: z.boolean() })
+export const ReferenceAnswerResponseSchema = z.object({ reference_answer: z.string(), cached: z.boolean(), sources: z.array(EvidenceHitSchema).optional() })
 export const CompareAnswerSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]), answer: z.string().min(1).max(12000), request_id: z.uuid() })
 const TrainingGapSchema = z.object({ point: z.string(), evidence: z.string(), exercise: z.string() })
 export const CompareAnswerResponseSchema = z.strictObject({ comparison: z.string(), attempt_id: z.string(), question_id: z.string(), question: z.string(), answer: z.string(), original_answer: z.string(), technical_gaps: z.array(TrainingGapSchema), expression_gaps: z.array(TrainingGapSchema), created_at: z.string(), assisted: z.literal(true) })
