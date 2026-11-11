@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    expose:
+      - "8000"
+    environment:
+      TRUST_PROXY: "true"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
