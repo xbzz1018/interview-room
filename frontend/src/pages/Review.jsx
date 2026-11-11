@@ -2,6 +2,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { BookOpen, BriefcaseBusiness, Sparkles, RotateCcw } from "lucide-react";
+import { ReferenceEvidence } from "../components/ProjectEvidence";
 import { getReview, getReferenceAnswer, startInterview, startJobPrep, retryReview } from "../api/interview";
 import useAuth from "../hooks/useAuth";
 import { jobPrepDraftKey } from "../lib/jobPrepAccount";
@@ -501,8 +502,9 @@ function inferAnswers(questions, transcript) {
   });
 }
 
-export function ResumeReferenceAnswers({ sessionId, questions, transcript, initialAnswers, attempts = [] }) {
+export function ResumeReferenceAnswers({ sessionId, questions, transcript, initialAnswers, initialSources = {}, attempts = [] }) {
   const [references, setReferences] = useState(initialAnswers || {});
+  const [sources, setSources] = useState({});
   const [loading, setLoading] = useState({});
   const [errors, setErrors] = useState({});
   const active = useRef(new Set());
@@ -516,6 +518,7 @@ export function ResumeReferenceAnswers({ sessionId, questions, transcript, initi
     try {
       const data = await getReferenceAnswer(sessionId, id);
       setReferences((previous) => ({ ...previous, [id]: data.reference_answer }));
+      setSources((previous) => ({ ...previous, [`reference_sources:${id}`]: data.sources || [] }));
     } catch (error) {
       setErrors((previous) => ({ ...previous, [id]: error.message || "生成失败，请重试。" }));
     } finally {
@@ -545,6 +548,7 @@ export function ResumeReferenceAnswers({ sessionId, questions, transcript, initi
                   <BookOpen size={13} />{loading[question.id] ? "正在生成参考答法…" : errors[question.id] ? "重试生成参考答法" : "生成参考答法"}
                 </Button>
               )}
+              <ReferenceEvidence sources={sources[`reference_sources:${question.id}`] || initialSources[`reference_sources:${question.id}`]} />
               {errors[question.id] && <p role="alert" className="mt-2 text-sm text-red">{errors[question.id]}</p>}
               {references[question.id] && <RetryAnswer key={`${sessionId}:${question.id}`} sessionId={sessionId} questionId={question.id} attempts={attempts.filter((item) => item.question_id === String(question.id))} />}
             </CardContent>
@@ -703,6 +707,7 @@ function ReviewSession() {
       {!archived && (currentMode === 'resume' || reportError) && <section aria-label="复盘进度" className="mb-5 rounded-xl border border-border bg-card p-4 text-sm">
         <p className="font-medium">{meta.review_stage === 'generating' ? (review ? '正在生成报告，内容会逐段保存…' : '模型正在分析，等待报告首段…') : meta.profile_sync_pending ? '报告已保存，可先阅读；画像正在后台同步…' : meta.profile_extract_failed ? '报告已保存，画像同步失败，可单独重试' : reportStatus === 'review_failed' ? '报告生成中断，已保存的内容仍可查看' : reportStatus === 'reviewed' ? '报告已完成' : '正在读取复盘状态'}</p>
         {meta.training_mode === 'coach' && <p className="mt-1 text-xs text-dim">本轮为教练练习，受帮助的回答不计入严格模拟分数趋势。</p>}
+        {Array.isArray(meta.evidence_projects) && meta.evidence_projects.length > 0 && <p className="mt-1 text-xs text-dim">本轮项目证据：{meta.evidence_projects.map(item => `${item.name}（${item.version.slice(0, 8)}）`).join("、")}。后续资料更新不改变此轮依据。</p>}
         {Array.isArray(meta.selected_materials) && meta.selected_materials.length > 0 && <p className="mt-1 text-xs text-dim">本轮材料快照：{meta.selected_materials.map((item) => `${item.filename}（${item.role}）`).join('、')}</p>}
         {meta.review_first_token_at && meta.review_started_at && <p className="mt-1 text-xs text-dim">报告首次内容：{Math.max(0, (Date.parse(meta.review_first_token_at) - Date.parse(meta.review_started_at)) / 1000).toFixed(1)} 秒{meta.review_report_ready_at ? ` · 正文完成：${Math.max(0, (Date.parse(meta.review_report_ready_at) - Date.parse(meta.review_started_at)) / 1000).toFixed(1)} 秒` : ''}</p>}
         {reportError && <p role="alert" className="mt-2 text-red">{reportError}</p>}
@@ -741,7 +746,7 @@ function ReviewSession() {
             </Card>
 
             {currentMode === "resume" && (
-              <ResumeReferenceAnswers key={sessionId} sessionId={sessionId} questions={questions} transcript={messages} initialAnswers={referenceAnswers} attempts={Array.isArray(meta.training_attempts) ? meta.training_attempts : []} />
+              <ResumeReferenceAnswers key={sessionId} sessionId={sessionId} questions={questions} transcript={messages} initialAnswers={referenceAnswers} initialSources={meta} attempts={Array.isArray(meta.training_attempts) ? meta.training_attempts : []} />
             )}
 
             {messages.length > 0 && (
