@@ -6,6 +6,8 @@
 
 支持 Windows 桌面与本机网页，自选模型 API，共用已保存的训练记录。
 
+[本地运行](#本地运行) · [使用说明](docs/usage.md) · [实现设计](docs/architecture.md)
+
 ![选择本轮简历、JD 与项目材料](images/workspace.png)
 
 界面预览使用示例资料与模拟模型。
@@ -18,6 +20,8 @@
 - **知识库与专项练习**：内置 12 个技术领域的快速提纲，以及 48 道带参考要点和追问的题目；支持编辑、导入和选择专项材料。
 - **多模型配置**：分别保存、测试和切换模型连接，支持 Responses、Chat Completions 和 Anthropic Messages。
 
+创建练习时保存所选材料的正文与版本，后续编辑资料不会改变已有面试。React 提供练习界面，Node.js 与 SQLite 保存问答、参考答法和重答记录，Electron 提供独立桌面窗口。
+
 ## 练习流程
 
 ```mermaid
@@ -28,7 +32,7 @@ flowchart LR
 ```
 
 <details>
-<summary>更多界面：参考答法、知识库与模型设置</summary>
+<summary>更多界面：参考答法与知识库</summary>
 
 原答与参考答法放在同一轮中，材料引用可展开查看。
 
@@ -38,23 +42,38 @@ flowchart LR
 
 ![深灰青绿主题下的快速提纲](images/knowledge.png)
 
-模型连接自行配置，以下为空白设置示例。
-
-![空白模型设置](images/model-settings-empty.png)
-
 </details>
 
 ## 本地运行
 
-需要 **Node.js 24.15+**。启动桌面版：
+需要 **Node.js 24.15+**。获取源码并启动桌面版：
 
 ```powershell
+git clone https://github.com/xbzz1018/interview-room.git
+cd interview-room
 npm ci
 npm run desktop
 ```
 
-网页版在安装依赖后执行 `npm run build`、`npm start`，访问 `http://127.0.0.1:4318`。
+网页版在安装依赖后执行：
 
-首次使用在“模型与设置”中填写并测试 API，再导入自己的简历与岗位资料。
+```powershell
+npm run build
+npm start
+```
+
+访问 `http://127.0.0.1:4318`。也可双击仓库中的 `启动面试练习室.cmd` 或 `启动网页版.cmd`。
+
+首次使用在「模型与设置」填写配置名称与以下参数，保存、测试并启用：
+
+| 参数 | 填写内容 |
+| --- | --- |
+| API 基础地址 | 服务商提供的接口地址 |
+| 请求协议 | Responses、Chat Completions 或 Anthropic Messages |
+| 模型 ID | 服务商实际支持的模型名称 |
+| API Key | 对应服务的调用凭据 |
+| 推理强度 | 按模型选择；不支持时使用「接口默认」 |
+
+然后导入简历和 JD，选择训练模式并创建练习。打包桌面版使用 `npm run package:desktop`；更多启动方式、材料格式与数据目录见[使用说明](docs/usage.md)。
 
 [MIT License](LICENSE)
