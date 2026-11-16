@@ -7,7 +7,6 @@
 - 原项目：[AnnaSuSu/TechSpar](https://github.com/AnnaSuSu/TechSpar)。保留原作者与贡献者署名。
 - 本地开发基线：`a3098711918e78613a2f265ac48cb44427bf5891`。
 - 根许可证保存在 [LICENSE](LICENSE)，原文不改；来源和变更集中记录于本文件。
-- 原有账号、知识库、画像、专项训练、Copilot、TypeScript 分层和桌面基础属于沿用部分，不列为本轮个人从零实现。
 
 ## 个人方向的修改
 
