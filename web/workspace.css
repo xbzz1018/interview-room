@@ -1,0 +1,211 @@
+/* Application layout: the window stays still; each working area owns its scroll. */
+:root{font-size:16px;--sidebar-width:224px;--muted:#647386;--line:#dde3eb}
+:root[data-theme=forest]{--muted:#acbcb6;--bg:#151b1e;--panel:#20282c;--rail:#192125;--line:#36433f}
+[hidden]{display:none!important}
+html,body,#root{height:100%;overflow:hidden}
+body{font-size:16px;line-height:1.65}
+button,input,select,textarea{font-size:15px}
+button{padding:9px 14px;min-height:40px}
+input,select,textarea{padding:9px 12px;line-height:1.6}
+label{font-size:15px}
+small{font-size:13px}
+h2{font-size:20px}h3{font-size:17px}
+summary{font-size:15px}
+.app-shell{height:100dvh;min-height:0;overflow:hidden}
+.sidebar{width:var(--sidebar-width);padding:24px 16px 16px}
+.sidebar .brand{font-size:19px;gap:10px;margin:0 4px 28px}
+.brand small{font-size:10px}.brand-mark{font-size:30px}
+.rail-label{font-size:12px;letter-spacing:.05em;margin:0 12px 10px}
+.sidebar nav{min-height:0;overflow:auto}
+.nav-item{font-size:16px;padding:11px 13px;margin-bottom:5px;gap:12px}
+.nav-item>span{font-size:12px}.nav-item>b{font-size:12px}
+.sidebar .rail-note{margin:20px 12px;font-size:13px}.rail-note p{font-size:14px}
+.settings-entry{font-size:15px;padding:10px 12px}
+.sidebar-footer{padding-top:15px;gap:12px;font-size:13px}
+.sidebar-footer small{font-size:12px}.swatch{min-height:0;width:25px;height:25px}
+main{height:100%;margin-left:var(--sidebar-width);display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:58px;min-height:58px;padding:0 26px;font-size:14px}
+.model-pill{font-size:12px;padding:5px 11px;max-width:300px}
+.content{width:100%;max-width:none;flex:1;min-height:0;padding:22px 26px;overflow:auto;scrollbar-gutter:stable}
+.page-title{margin-bottom:20px;gap:14px;flex-shrink:0}
+.page-title .eyebrow{font-size:12px;letter-spacing:.05em;margin-bottom:4px}
+.page-title h1{font-size:26px;line-height:1.4;letter-spacing:0}
+.page-title p{font-size:15px;line-height:1.65;margin-top:6px;max-width:900px}
+.page-title>button{font-size:14px;margin-top:0}
+.panel{padding:22px;border-radius:10px}
+.section-head{margin-bottom:17px;gap:12px}
+.section-head h2{font-size:19px}.section-head p{font-size:14px}
+.tag{font-size:12px;padding:2px 7px}
+.eyebrow{font-size:12px;letter-spacing:.06em}
+.muted,.basis-note,.field-error,.import-notice{font-size:14px;line-height:1.75}
+.primary{font-size:15px;padding:10px 18px}
+.text-button{font-size:14px;min-height:30px}
+.button-row{gap:9px;margin-top:15px}.button-row button{font-size:14px}
+.panel-footer{padding:14px 20px;margin:0;border-top:1px solid var(--line);background:var(--panel);gap:12px}
+.panel-footer>span{font-size:13px;line-height:1.6;max-width:65%}
+.banner{font-size:15px;margin-bottom:14px;padding:10px 14px;flex-shrink:0}
+.banner button{font-size:13px;min-height:30px}
+.empty{padding:34px 24px;min-height:210px}.empty h3{font-size:21px}.empty p{font-size:15px}
+.prose{font-size:17px;line-height:1.85;white-space:normal}
+.prose p{margin-top:10px}.prose h4{font-size:20px;line-height:1.5;margin:24px 0 10px}
+.prose h4:first-child{margin-top:8px}.prose pre{font-size:15px}
+.check-label{font-size:14px;line-height:1.65}
+
+/* Preparation: scrolling fields and a permanently visible create action. */
+.content[data-page=workspace]:has(.setup-grid),.content[data-page=topic]{display:flex;flex-direction:column;overflow:hidden}
+.setup-grid{flex:1;min-height:0;grid-template-columns:minmax(0,1fr) 255px;gap:20px}
+.setup-main{padding:0;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.setup-fields{padding:22px;overflow:auto;min-height:0;flex:1}
+.setup-main>.panel-footer{flex-shrink:0}
+.setup-main .section-head{margin-bottom:12px}.setup-main .section-head p{font-size:13px}
+.setup-main .spaced{margin-top:20px;padding-top:18px}
+.two-fields{gap:16px}.two-fields label{min-width:0}
+.step-no{font-size:12px;min-width:28px}
+.basis-note{padding:8px 0}.supplement-title{font-size:16px;margin:15px 0 9px}
+.focus-options summary{font-size:14px}
+.material-options{max-height:200px;gap:10px}
+.material-choice{padding:10px 12px}.material-choice strong{font-size:15px}.material-choice small{font-size:12px}
+.selection-count{font-size:13px}.mode{padding:13px 15px}.mode h3{font-size:17px}.mode p{font-size:14px}
+.setup-aside{display:flex;flex-direction:column;gap:16px;overflow:auto;max-height:100%;align-self:stretch}
+.note-card,.connection-card{padding:22px}
+.note-card h2{font-size:23px;margin:10px 0 19px}.note-card li{font-size:15px;margin-bottom:18px}
+.note-card li p,.connection-card p{font-size:14px}.note-card li b{font-size:12px}
+.connection-card h3{font-size:18px}.connection-card>.eyebrow,.note-card>.eyebrow{font-size:12px}
+.connection-card>.text-button{font-size:14px}
+.topic-picker{overflow:auto;min-height:0;margin-bottom:14px}.topic-picker .section-head{margin-bottom:14px}
+.topic-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.topic-choice{padding:17px 18px}.topic-choice strong{font-size:18px}.topic-choice p{font-size:14px;margin:6px 0 8px}.topic-choice small{font-size:13px}
+.topic-prompt{flex-shrink:0;padding:0 2px;margin:0;min-height:0}
+.domain-selection{padding:13px 18px;margin-bottom:14px;flex-shrink:0;max-height:190px;overflow:auto}
+.domain-selection .section-head{margin:0;flex-wrap:wrap}.domain-selection .section-head>div{flex:1}
+.domain-selection details{margin-top:10px;padding-top:10px}.domain-selection h2{font-size:17px}
+
+/* Knowledge: compact header, independent domain list and full-height reading surface. */
+.content[data-page=knowledge]{display:flex;flex-direction:column;overflow:hidden;padding-bottom:16px}
+.content[data-page=knowledge]>.page-title{margin-bottom:15px}
+.content[data-page=knowledge]>.page-title .eyebrow{display:none}
+.knowledge-layout{flex:1;min-height:0;grid-template-columns:190px minmax(0,1fr);gap:18px;align-items:stretch}
+.domain-rail{position:static;max-height:none;height:100%;min-height:0;overflow:auto;padding:16px 10px}
+.domain-rail h2{font-size:16px;margin-bottom:12px}
+.domain-entry{font-size:15px;padding:10px 11px;min-height:43px}.domain-entry small{font-size:12px}
+.knowledge-main{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.knowledge-heading{padding:0 0 12px;border:0;border-radius:0;box-shadow:none;background:transparent;gap:10px;align-items:center;flex-shrink:0;flex-wrap:nowrap}
+.knowledge-heading .eyebrow{display:none}.knowledge-heading h2{font-size:22px;margin:0}
+.knowledge-heading .muted{font-size:14px;margin-top:3px}
+.knowledge-heading .button-row{max-width:none;gap:5px;flex-wrap:wrap}
+.knowledge-heading .button-row button{font-size:13px;padding:8px 10px}
+.knowledge-tabs{margin:0;gap:25px;flex-shrink:0}.knowledge-tabs button{font-size:16px;padding:11px 0}
+.knowledge-tools{margin:12px 0;gap:12px;flex-shrink:0;flex-wrap:nowrap}
+.knowledge-tools>label{max-width:330px;flex-basis:auto;font-size:0}.knowledge-tools input{margin:0;font-size:15px}
+.knowledge-tools .button-row{flex-wrap:nowrap;gap:7px}.knowledge-tools button{font-size:14px;white-space:nowrap;padding:9px 12px}
+.knowledge-files{display:block;flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.knowledge-picker{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-shrink:0;font-size:14px;flex-wrap:wrap}
+.knowledge-picker select{flex:1;min-width:180px;width:auto;margin:0;font-size:15px}
+.knowledge-file{padding:20px 24px;box-shadow:none;border:0;border-radius:0;border-bottom:1px solid var(--line)}
+.knowledge-file:last-child{border-bottom:0}.knowledge-file .section-head{margin-bottom:8px;align-items:center}
+.knowledge-file h3{font-size:18px}.knowledge-file .section-head small{font-size:12px}
+.knowledge-file .section-head button{font-size:13px;padding:7px 10px}
+.knowledge-file details{margin-top:10px;padding-top:9px}.knowledge-file summary{font-size:13px;color:var(--muted)}
+.knowledge-file .prose{padding-top:10px}.knowledge-footnote{font-size:13px;margin-top:9px;flex-shrink:0;line-height:1.6}
+.knowledge-job{max-height:180px;overflow:auto;padding:12px 16px;flex-shrink:0;margin-bottom:10px}
+.topic-form{flex-shrink:0;padding:16px;margin-bottom:14px}
+
+/* Saved materials use a dedicated editor instead of making the library longer. */
+.library-tools{margin-bottom:18px;grid-template-columns:210px minmax(0,1fr)}
+.material-grid{gap:16px}.material-card{padding:20px}.material-card h3{font-size:19px;margin:12px 0 9px}
+.excerpt{font-size:15px;line-height:1.8;min-height:90px}.card-meta{font-size:13px;margin:14px 0}
+.card-actions button{font-size:14px}.card-top small{font-size:13px}
+.editor-panel{position:fixed;z-index:20;inset:78px 34px 24px calc(var(--sidebar-width) + 34px);display:flex;flex-direction:column;margin:0;padding:0;overflow:hidden;box-shadow:0 12px 70px #0004;border:2px solid var(--line)}
+.editor-panel>.section-head{padding:14px 22px;margin:0;border-bottom:1px solid var(--line);flex-shrink:0}
+.editor-fields{flex:1;min-height:0;overflow:auto;padding:20px 22px}
+.editor-panel>.panel-footer{flex-shrink:0}.editor-toolbar{gap:10px;margin:14px 0}.editor-toolbar span{font-size:13px}
+.material-text{font-size:17px;line-height:1.8;min-height:260px;height:34vh}
+
+/* Interview: the question and evidence areas scroll without moving the window. */
+.content[data-page=workspace]:has(.practice-grid){display:flex;flex-direction:column;overflow:hidden}
+.session-tabs{margin:0 0 14px;gap:25px;flex-shrink:0}.session-tabs button{font-size:16px;padding:10px 0}
+.session-tabs>span{font-size:13px}.generation-meta{font-size:13px;margin:0 0 10px;flex-shrink:0}
+.practice-grid{flex:1;min-height:0;grid-template-columns:minmax(0,1fr) 285px;gap:18px}
+.practice-main{min-height:0;overflow:auto;position:relative;padding:24px}
+.practice-main>.panel-footer{position:sticky;bottom:-24px;margin:20px -24px -24px;z-index:2}
+.practice-aside{min-height:0;overflow:auto;display:block}.practice-aside .panel{padding:18px;margin-bottom:16px}
+.question-heading h2{font-size:23px;line-height:1.7;margin-top:9px}.question-heading{margin-bottom:18px}
+.answer-editor>label{font-size:15px}.answer-editor textarea{font-size:17px;line-height:1.8;min-height:210px;height:30vh}
+.answer-footer>span{font-size:13px}.learning .section-head h3{font-size:18px}.learning .eyebrow,.saved-answer>.eyebrow{font-size:12px}
+.question-link{font-size:15px;line-height:1.65;padding:12px 5px}.question-link small,.question-link>span{font-size:12px}
+.evidence-panel summary,.evidence-text{font-size:14px}.evidence-panel .muted{font-size:13px}.evidence-panel h3{font-size:18px}
+.job-status{flex-shrink:0;max-height:210px;overflow:auto;margin-bottom:12px}.job-status strong{font-size:15px}.job-status p,.job-status small{font-size:13px}
+.job-status details{max-height:110px}.strict-note{font-size:14px}
+
+/* Settings are separate tasks; the model editor and its save action share a viewport. */
+.content[data-page=settings]{display:flex;flex-direction:column;overflow:hidden}
+.settings-tabs{margin-bottom:18px}.settings-body{flex:1;min-height:0;overflow:hidden}
+.models-layout{display:grid;grid-template-columns:245px minmax(0,1fr);gap:18px;height:100%;min-height:0}
+.profile-manager{margin:0;padding:18px;overflow:auto;min-height:0}
+.profile-manager .section-head{display:block}.profile-manager .section-head h2{font-size:18px}.profile-manager .section-head p{font-size:13px}
+.profile-manager .button-row{margin-top:12px;gap:7px}.profile-manager .button-row button{font-size:13px;padding:7px 9px}
+.profile-list{grid-template-columns:1fr;gap:10px;margin:15px 0}.profile-choice{padding:13px;gap:4px}
+.profile-choice strong{font-size:16px}.profile-choice span,.profile-choice small{font-size:13px}
+.model-active{font-size:14px}.profile-manager>.muted{font-size:13px}
+.profile-editor{min-width:0;min-height:0;display:flex;flex-direction:column}
+.profile-editor>.settings-panel{flex:1;min-height:0;max-width:none;margin:0;display:flex;flex-direction:column;overflow:hidden;padding:0}
+.profile-editor>.settings-panel>.section-head{padding:15px 21px;margin:0;border-bottom:1px solid var(--line)}
+.model-form-fields{padding:18px 21px;overflow:auto;min-height:0;flex:1}
+.model-form-fields>.two-fields{margin-bottom:14px}.model-form-fields>.two-fields label{margin:0}
+.model-form-fields>.basis-note{font-size:13px;margin:6px 0 13px;padding:0}
+.model-form-fields label{font-size:15px}.model-form-fields>.check-label{margin-top:8px;font-size:13px}
+.model-advanced{margin-top:15px;padding-top:12px}.model-advanced summary{font-size:14px}.model-advanced>.two-fields{margin-top:13px}
+.profile-editor .panel-footer{flex-shrink:0;padding:12px 20px}.profile-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;max-width:100%}
+.profile-actions button{font-size:13px;padding:8px 11px}.profile-actions .muted{font-size:13px}
+.backup-panel{max-width:none;overflow:auto;min-height:0}.about{max-width:none;font-size:16px;overflow:auto;padding:26px}
+.about summary{font-size:15px}.about>span{font-size:15px;margin-top:8px}
+
+/* History and progress keep their headers while their own content can grow. */
+.history-row{padding:18px 22px}.history-open h3{font-size:18px}.history-open p{font-size:14px}
+.progress-metrics{gap:14px;margin-bottom:18px}.metric-card{padding:18px 20px}.metric-card>span{font-size:15px}.metric-card small{font-size:13px}
+.progress-sessions table{font-size:15px}thead th{font-size:13px}tbody th>small{font-size:13px}
+.progress-recent summary{font-size:16px}.progress-recent summary>small{font-size:13px}.progress-recent details>h3{font-size:17px}
+@media(max-height:800px) and (min-width:761px){
+  .sidebar{padding-top:19px}.sidebar .brand{margin-bottom:20px}.sidebar .rail-note{display:none}
+  .content{padding-top:16px;padding-bottom:16px}.page-title{margin-bottom:14px}.page-title .eyebrow{display:none}
+  .page-title p{font-size:14px}.setup-aside .note-card{display:none}.setup-fields{padding:18px 21px}
+  .setup-main .spaced{margin-top:16px;padding-top:14px}.editor-panel{top:72px;bottom:18px}
+}
+@media(max-width:1200px) and (min-width:761px){
+  :root{--sidebar-width:205px}.content{padding-left:20px;padding-right:20px}.topbar{padding:0 20px}
+  .setup-grid{grid-template-columns:minmax(0,1fr)}.setup-aside{display:none}
+  .practice-grid{grid-template-columns:minmax(0,1fr) 245px}.knowledge-layout{grid-template-columns:160px minmax(0,1fr);gap:14px}
+  .models-layout{grid-template-columns:205px minmax(0,1fr);gap:14px}.knowledge-heading{flex-wrap:wrap}
+  .knowledge-heading .muted{display:none}.knowledge-tools button{padding:8px;font-size:13px}
+}
+@media(max-width:760px){
+  html,body,#root{height:auto;min-height:100%;overflow:auto}.app-shell{height:auto;min-height:100dvh;overflow:visible;display:block}
+  .sidebar{position:relative;width:100%;padding:16px 16px 10px}.sidebar .brand{font-size:18px;margin:0 0 15px}
+  .sidebar nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;overflow:visible}.nav-item{font-size:13px;padding:10px 1px;margin:0}
+  .sidebar-footer{position:absolute;top:21px;right:17px;border:0;padding:0}.sidebar-footer>span,.rail-label,.sidebar .rail-note{display:none}
+  .settings-entry{font-size:14px;padding:8px;margin-top:7px}.swatch{width:23px;height:23px}
+  main{margin:0;height:auto;overflow:visible;display:block}.topbar{height:50px;min-height:50px;padding:0 16px;font-size:12px}
+  .content,.content[data-page=knowledge],.content[data-page=settings],.content[data-page=topic],.content[data-page=workspace]:has(.setup-grid),.content[data-page=workspace]:has(.practice-grid){display:block;padding:20px 16px;overflow:visible}
+  .page-title{margin-bottom:18px}.page-title h1{font-size:24px}.page-title p{font-size:14px}.page-title .eyebrow{display:none}
+  .page-title>button{font-size:13px;padding:8px 10px}.setup-grid,.practice-grid{display:block}.setup-aside{display:none}
+  .setup-fields{padding:18px}.setup-main>.panel-footer{position:sticky;bottom:0;z-index:2;box-shadow:0 -2px 12px #0001}
+  .panel-footer{padding:13px 16px}.panel-footer>span{font-size:12px;max-width:100%}.two-fields{grid-template-columns:1fr}
+  .material-options{grid-template-columns:1fr;max-height:250px}.mode-options{grid-template-columns:1fr 1fr}.mode p{font-size:13px}
+  .topic-grid{grid-template-columns:1fr 1fr}.topic-choice{padding:13px}.topic-choice strong{font-size:16px}.topic-choice p{font-size:13px}
+  .knowledge-layout{display:block}.domain-rail{height:auto;padding:14px;margin-bottom:14px}.domain-list{display:flex;overflow-x:auto}
+  .domain-entry{font-size:14px;flex-shrink:0}.knowledge-main{display:block;overflow:visible}.knowledge-heading{flex-wrap:wrap}
+  .knowledge-heading .button-row{justify-content:flex-start}.knowledge-tools{flex-wrap:wrap}.knowledge-tools>label{flex-basis:100%;max-width:none}
+  .knowledge-tools .button-row{flex-wrap:wrap}.knowledge-files{max-height:75dvh;overflow:auto}.knowledge-file{padding:16px}
+  .knowledge-footnote{font-size:12px}.prose{font-size:16px}.prose h4{font-size:19px}
+  .editor-panel{inset:15px 12px;z-index:25}.editor-panel>.section-head{padding:12px 16px}.editor-fields{padding:16px}
+  .editor-panel>.panel-footer{padding:12px 16px}.material-text{font-size:16px;height:35dvh}
+  .practice-main{padding:18px;margin-bottom:16px;max-height:85dvh}.practice-main>.panel-footer{bottom:-18px;margin:18px -18px -18px}
+  .practice-aside{overflow:visible}.question-heading h2{font-size:21px}.answer-editor textarea{font-size:16px}
+  .models-layout{display:block;height:auto}.profile-manager{max-height:260px;margin-bottom:16px;padding:16px}
+  .profile-list{display:flex;overflow:auto}.profile-choice{min-width:180px}.profile-editor>.settings-panel{max-height:80dvh}
+  .model-form-fields{padding:16px}.profile-editor>.settings-panel>.section-head{padding:13px 16px}
+  .settings-tabs{gap:22px}.session-tabs button{font-size:15px}.profile-editor .panel-footer{padding:12px 16px}
+  .progress-metrics{grid-template-columns:1fr 1fr}.progress-recent summary{flex-wrap:wrap}.progress-recent summary>small{font-size:12px}
+  .model-pill{font-size:11px;max-width:150px}.library-tools{grid-template-columns:1fr;gap:12px}.history-open p{font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
