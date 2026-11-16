@@ -20,7 +20,7 @@
     "package:desktop": "npm run build:desktop && npm run licenses && node scripts/package-desktop.mjs",
     "test:desktop": "node scripts/smoke-desktop.ts",
     "test": "node --test tests/*.test.ts",
-    "check": "npm test && npm run build",
+    "check": "npm run build && npm test",
     "export:legacy": "node scripts/export-legacy.ts",
     "convert:prep": "node scripts/convert-prep.ts",
     "test:ui": "node scripts/smoke-ui.ts",
