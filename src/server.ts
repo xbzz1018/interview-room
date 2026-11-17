@@ -9,7 +9,7 @@ import { KnowledgeLibrary } from './knowledge.ts';
 import { ModelProfiles } from './model-profiles.ts';
 import { PracticeService } from './service.ts';
 import { InputError, object, settingsFrom } from './model.ts';
-import type { Job, Material, Session, Topic } from './model.ts';
+import type { Job, Material, Session } from './model.ts';
 import { commitImport, previewImport } from './migration.ts';
 import { extractPdf, extractImage } from './extract.ts';
 import { acquireInstance } from './instance.ts';

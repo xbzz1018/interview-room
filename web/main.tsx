@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Job, KnowledgeSection, Material, MaterialKind, Session, Settings, Topic, Turn } from '../src/model.ts';
+import type { Job, KnowledgeSection, Material, MaterialKind, PublicSettings, Session, Topic, Turn } from '../src/model.ts';
 import type { ImportPreview } from '../src/migration.ts';
 import { api, base64, download } from './api.ts';
+import type { Act } from './api.ts';
 import './style.css';
 import './workspace.css';
 import { Knowledge } from './knowledge.tsx';
@@ -10,7 +11,6 @@ import { ModelSettings } from './models.tsx';
 
 type Page = 'workspace' | 'materials' | 'history' | 'resume' | 'topic' | 'progress' | 'knowledge' | 'settings';
 const pages: Record<Page, string> = { workspace: '开始面试', history: '复盘与重练', materials: '资料与学习', resume: '我的简历', topic: '专项练习', progress: '能力记录', knowledge: '备面知识库', settings: '模型与设置' };
-type PublicSettings = Omit<Settings, 'apiKey'> & { hasApiKey: boolean };
 const kinds = { resume: '简历', project: '项目', jd: '岗位 JD', notes: '知识笔记' };
 const time = (value: string) => new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 const id = () => crypto.randomUUID();
@@ -184,7 +184,6 @@ function Setup({ variant, materials, settings, busy, onCreate, onMaterials, onSe
       <section className="connection-card"><span className="eyebrow">本轮使用的模型</span><h3>{settings.model}</h3><p>{settings.protocol === 'responses' ? 'Responses API' : settings.protocol === 'anthropic' ? 'Anthropic Messages' : 'Chat Completions'} · {settings.effort || '默认强度'}</p><span className={`tag ${settings.hasApiKey ? 'live' : ''}`}>{settings.hasApiKey ? '已配置 API Key' : '需要填写 API Key'}</span><button className="text-button" onClick={onSettings}>模型设置 ↗</button></section>
     </aside></div>}</>;
 }
-type Act = <T>(action: () => Promise<T>, message?: string) => Promise<T | undefined>;
 function Materials({ initialKind, materials, busy, act, topics }: { initialKind?: MaterialKind; materials: Material[]; busy: boolean; act: Act; topics: Topic[] }) {
   const [editing, setEditing] = useState<Material | null | undefined>(undefined);
   const [filter, setFilter] = useState(''), [query, setQuery] = useState('');

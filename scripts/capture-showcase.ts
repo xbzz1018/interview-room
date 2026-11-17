@@ -27,7 +27,7 @@ const service = new PracticeService(store, async (_settings, messages, _signal, 
 });
 const resume = service.material({ title: '后端开发简历（示例）', kind: 'resume', text: '合成候选人：负责资料管理接口与会话版本隔离，用于展示面试练习流程。' });
 const jd = service.material({ title: '后端开发岗位 JD（示例）', kind: 'jd', text: '要求理解事务、并发冲突与故障恢复，能解释方案取舍和验证方法。' });
-const project = service.material({ title: '材料版本管理（示例）', kind: 'project', text: '本示例在创建会话时复制材料正文和版本；后续编辑或删除资料不改历史快照。测试通过更新资料后对比新旧会话验证隔离，无真实业务性能指标。' });
+service.material({ title: '材料版本管理（示例）', kind: 'project', text: '本示例在创建会话时复制材料正文和版本；后续编辑或删除资料不改历史快照。测试通过更新资料后对比新旧会话验证隔离，无真实业务性能指标。' });
 const application = createApplication(store, service);
 await new Promise<void>(resolve => application.server.listen(0, '127.0.0.1', resolve));
 const address = application.server.address(); assert.ok(address && typeof address === 'object');

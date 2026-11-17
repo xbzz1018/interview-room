@@ -1,3 +1,5 @@
+export type Act = <T>(action: () => Promise<T>, message?: string) => Promise<T | undefined>;
+
 let token = '';
 export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   if (!token) {

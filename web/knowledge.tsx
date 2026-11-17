@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { Job, KnowledgeSection, Material, Topic } from '../src/model.ts';
 import { api, base64 } from './api.ts';
+import type { Act } from './api.ts';
 
-type Act = <T>(action: () => Promise<T>, message?: string) => Promise<T | undefined>;
 type Props = {
   topics: Topic[]; materials: Material[]; busy: boolean; act: Act; onRefresh: () => Promise<void>; onTrain: (id: string) => void;
   editor: (material: Material | null, topicId: string, section: KnowledgeSection, onClose: () => void) => React.ReactNode;

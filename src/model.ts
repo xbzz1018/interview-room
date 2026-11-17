@@ -21,6 +21,7 @@ export type Settings = {
   theme: 'ink' | 'forest';
   tokenParameter?: 'max_tokens' | 'max_completion_tokens';
 };
+export type PublicSettings = Omit<Settings, 'apiKey'> & { hasApiKey: boolean };
 export type ModelProfile = { id: string; name: string; provider: string; connection: Omit<Settings, 'theme'>; revision: number; createdAt: string; updatedAt: string };
 export type PublicModelProfile = Omit<ModelProfile, 'connection'> & { connection: Omit<ModelProfile['connection'], 'apiKey'> & { hasApiKey: boolean } };
 export const defaultSettings: Settings = {

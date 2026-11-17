@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import type { PublicModelProfile, Settings } from '../src/model.ts';
+import { useEffect, useState } from 'react';
+import type { PublicModelProfile, PublicSettings, Settings } from '../src/model.ts';
 import { api } from './api.ts';
+import type { Act } from './api.ts';
 
-type PublicSettings = Omit<Settings, 'apiKey'> & { hasApiKey: boolean };
-type Act = <T>(action: () => Promise<T>, message?: string) => Promise<T | undefined>;
 type Profiles = { activeId: string; profiles: PublicModelProfile[] };
 const presets = [
   { id: 'custom', label: '自定义 / 兼容网关', url: '', protocol: 'responses', tokens: 'max_completion_tokens', effort: '', hint: '填写网关实际提供的模型 ID；同一家网关可以保存多份模型配置。' },
