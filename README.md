@@ -8,13 +8,9 @@
 
 [本地运行](#本地运行) · [使用说明](docs/usage.md) · [实现设计](docs/architecture.md)
 
-<!-- portfolio-preview:start -->
-[浏览项目与交互示例](https://kukup.xbzz.cloud/projects/interview-room)
+![选择本轮简历、JD 与项目材料](images/workspace.png)
 
-![项目首页与功能入口](https://kukup.xbzz.cloud/images/interview-home.webp?v=963a5ea00c6e)
-
-<sub>项目首页 · 示例资料与展示配色。点击上方链接，从首页继续浏览各项功能。</sub>
-<!-- portfolio-preview:end -->
+界面预览使用示例资料与模拟模型。
 
 ## 核心功能
 
