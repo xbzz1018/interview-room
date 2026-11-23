@@ -37,6 +37,16 @@
 
 项目内启动使用 `data/interview-room.db`。单独打开发行 exe 默认使用 `%APPDATA%/interview-room-v2/data`；可传 `--data-dir=绝对目录` 指定已有工作区。
 
+需要临时使用另一套工作区时，可以在 PowerShell 设置目录和端口，再启动网页。以下命令假定已经完成 `npm run build`。
+
+```powershell
+$env:INTERVIEW_DATA_DIR = Join-Path $PWD.Path 'data-practice'
+$env:INTERVIEW_PORT = '4319'
+npm start
+```
+
+打开 <http://127.0.0.1:4319>。退出服务后，运行 `Remove-Item Env:INTERVIEW_DATA_DIR, Env:INTERVIEW_PORT` 恢复该终端的默认启动配置。
+
 桌面菜单“工作区 → 在浏览器打开”连接同一服务。两端共用已保存的材料、模型配置与记录，未保存草稿分别位于各自的 localStorage。换浏览器、改端口或清浏览器数据可能无法恢复草稿。
 
 “模型与设置 → 备份与迁移”可导出文字备份，导入先预览再追加，不覆盖同 ID 的已有内容。文字备份不含模型配置、Key、生成任务或未保存草稿。整库包含凭据，复制整库前先退出服务，勿公开上传。
